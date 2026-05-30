@@ -28,7 +28,7 @@ function App() {
     const [newPurchase, setNewPurchase] = useState({ supplier_id: '', items: [{ product_id: '', quantity: '', cost_price: '' }] });
     const [newSale, setNewSale] = useState({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
 
-    const API_URL = 'http://localhost:5000';
+    const API_URL = 'https://inventory-backend.onrender.com';
 
     // Login function
     const handleLogin = async (e) => {
