@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
+
 const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
+
 function App() {
+    // ========== AUTHENTICATION STATES ==========
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [user, setUser] = useState(null);
     const [email, setEmail] = useState('');
@@ -8,7 +11,7 @@ function App() {
     const [showPassword, setShowPassword] = useState(false);
     const [message, setMessage] = useState('');
     
-    // Data states
+    // ========== DATA STATES ==========
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
@@ -16,20 +19,20 @@ function App() {
     const [purchases, setPurchases] = useState([]);
     const [sales, setSales] = useState([]);
     const [salesStats, setSalesStats] = useState({ totalSales: 0, todaySales: 0, saleCount: 0 });
-    const [selectedCategory, setSelectedCategory] = useState(null);
     
-    // UI states
+    // ========== UI STATES ==========
     const [activeTab, setActiveTab] = useState('dashboard');
     const [showProductForm, setShowProductForm] = useState(false);
     const [showPurchaseForm, setShowPurchaseForm] = useState(false);
     const [showSaleForm, setShowSaleForm] = useState(false);
+    const [selectedCategory, setSelectedCategory] = useState(null);
     
-    // Form states
+    // ========== FORM STATES ==========
     const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity_in_stock: '', category_id: '' });
     const [newPurchase, setNewPurchase] = useState({ supplier_id: '', items: [{ product_id: '', quantity: '', cost_price: '' }] });
     const [newSale, setNewSale] = useState({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
 
-       // Mobile detection
+    // ========== MOBILE DETECTION ==========
     const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
     
     useEffect(() => {
@@ -38,7 +41,7 @@ function App() {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // Login function
+    // ========== LOGIN FUNCTION ==========
     const handleLogin = async (e) => {
         e.preventDefault();
         setMessage('Logging in...');
@@ -66,38 +69,38 @@ function App() {
         }
     };
 
-    // Load all data
+    // ========== LOAD ALL DATA ==========
     const loadAllData = async () => {
         try {
             // Load categories
             const catRes = await fetch(`${API_URL}/api/v1/categories`);
             const catData = await catRes.json();
-            if (catData.success) setCategories(catData.data);
+            if (catData.success) setCategories(catData.data || []);
             
             // Load products
             const prodRes = await fetch(`${API_URL}/api/v1/products`);
             const prodData = await prodRes.json();
-            if (prodData.success) setProducts(prodData.data);
+            if (prodData.success) setProducts(prodData.data || []);
             
             // Load suppliers
             const supRes = await fetch(`${API_URL}/api/v1/suppliers`);
             const supData = await supRes.json();
-            if (supData.success) setSuppliers(supData.data);
+            if (supData.success) setSuppliers(supData.data || []);
             
             // Load customers
             const custRes = await fetch(`${API_URL}/api/v1/customers`);
             const custData = await custRes.json();
-            if (custData.success) setCustomers(custData.data);
+            if (custData.success) setCustomers(custData.data || []);
             
             // Load purchases
             const purRes = await fetch(`${API_URL}/api/v1/purchases`);
             const purData = await purRes.json();
-            if (purData.success) setPurchases(purData.data);
+            if (purData.success) setPurchases(purData.data || []);
             
             // Load sales
             const saleRes = await fetch(`${API_URL}/api/v1/sales`);
             const saleData = await saleRes.json();
-            if (saleData.success) setSales(saleData.data);
+            if (saleData.success) setSales(saleData.data || []);
             
             // Load sales stats
             const statsRes = await fetch(`${API_URL}/api/v1/sales/stats`);
@@ -109,7 +112,7 @@ function App() {
         }
     };
 
-    // Product functions
+    // ========== PRODUCT FUNCTIONS ==========
     const handleAddProduct = async (e) => {
         e.preventDefault();
         try {
@@ -146,7 +149,7 @@ function App() {
         }
     };
 
-    // Purchase functions
+    // ========== PURCHASE FUNCTIONS ==========
     const handleAddPurchase = async (e) => {
         e.preventDefault();
         try {
@@ -186,7 +189,7 @@ function App() {
         setNewPurchase({ ...newPurchase, items });
     };
 
-    // Sale functions
+    // ========== SALE FUNCTIONS ==========
     const handleAddSale = async (e) => {
         e.preventDefault();
         try {
@@ -228,6 +231,7 @@ function App() {
         setNewSale({ ...newSale, items });
     };
 
+    // ========== LOGOUT ==========
     const handleLogout = () => {
         setIsLoggedIn(false);
         setUser(null);
@@ -237,7 +241,7 @@ function App() {
 
     const toggleShowPassword = () => setShowPassword(!showPassword);
 
-    // Login Screen
+    // ========== LOGIN SCREEN ==========
     if (!isLoggedIn) {
         return (
             <div style={styles.container}>
@@ -262,9 +266,10 @@ function App() {
         );
     }
 
-    // Dashboard Screen
+    // ========== DASHBOARD SCREEN ==========
     return (
         <div style={styles.appContainer}>
+            {/* Navbar */}
             <nav style={styles.navbar}>
                 <h2 style={styles.navTitle}>Inventory System</h2>
                 <div style={styles.navRight}>
@@ -274,7 +279,8 @@ function App() {
                 </div>
             </nav>
             
-                        <div style={styles.tabs}>
+            {/* Tabs - Mobile Dropdown or Desktop Buttons */}
+            <div style={styles.tabs}>
                 {isMobile ? (
                     <select 
                         value={activeTab} 
@@ -297,9 +303,10 @@ function App() {
             </div>
             
             <div style={styles.dashboard}>
-                {/* Dashboard Tab */}
+                {/* ========== DASHBOARD TAB ========== */}
                 {activeTab === 'dashboard' && (
                     <>
+                        {/* Stats Cards */}
                         <div style={styles.statsGrid}>
                             <div style={styles.statCard}><h3>Total Products</h3><p style={styles.statNumber}>{products.length}</p></div>
                             <div style={styles.statCard}><h3>Total Sales</h3><p style={styles.statNumber}>${salesStats.totalSales?.toLocaleString() || 0}</p></div>
@@ -307,128 +314,107 @@ function App() {
                             <div style={styles.statCard}><h3>Transactions</h3><p style={styles.statNumber}>{salesStats.saleCount || 0}</p></div>
                         </div>
                         
-                       <div style={styles.categoriesSection}>
-    <div style={styles.sectionHeader}>
-        <h3 style={styles.sectionTitle}>Product Categories</h3>
-        {selectedCategory && (
-            <button 
-                onClick={() => setSelectedCategory(null)} 
-                style={styles.showAllButton}
-            >
-                Show All Products
-            </button>
-        )}
-    </div>
-    <div style={styles.categoryList}>
-        {categories.map((cat) => {
-            const categoryId = cat.category_id || cat.id;
-            const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
-            return (
-                <div 
-                    key={categoryId} 
-                    style={{
-                        ...styles.categoryCard,
-                        ...(selectedCategory === categoryId ? styles.categoryCardActive : {}),
-                        cursor: 'pointer'
-                    }}
-                    onClick={() => setSelectedCategory(categoryId)}
-                >
-                    <h4>{cat.category_name || cat.name}</h4>
-                    <p>{cat.description}</p>
-                    <small style={styles.productCount}>{productCount} product(s)</small>
-                </div>
-            );
-        })}
-    </div>
-</div>
+                        {/* Clickable Categories Section */}
+                        <div style={styles.categoriesSection}>
+                            <div style={styles.sectionHeader}>
+                                <h3 style={styles.sectionTitle}>Product Categories</h3>
+                                {selectedCategory && (
+                                    <button onClick={() => setSelectedCategory(null)} style={styles.showAllButton}>
+                                        Show All Products
+                                    </button>
+                                )}
+                            </div>
+                            <div style={styles.categoryList}>
+                                {categories.map((cat) => {
+                                    const categoryId = cat.category_id || cat.id;
+                                    const categoryName = cat.category_name || cat.name;
+                                    const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
+                                    return (
+                                        <div 
+                                            key={categoryId} 
+                                            style={{
+                                                ...styles.categoryCard,
+                                                ...(selectedCategory === categoryId ? styles.categoryCardActive : {}),
+                                                cursor: 'pointer'
+                                            }}
+                                            onClick={() => setSelectedCategory(categoryId)}
+                                        >
+                                            <h4 style={selectedCategory === categoryId ? { color: 'white' } : {}}>{categoryName}</h4>
+                                            <p style={selectedCategory === categoryId ? { color: '#e0e0e0' } : {}}>{cat.description}</p>
+                                            <small style={styles.productCount}>{productCount} product(s)</small>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                        
+                        {/* Recent Sales */}
+                        <div style={styles.productsSection}>
+                            <h3 style={styles.sectionTitle}>Recent Sales</h3>
+                            <div style={styles.productTable}>
+                                <table style={styles.table}>
+                                    <thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Total</th><th>Items</th></tr></thead>
+                                    <tbody>
+                                        {sales.slice(0, 5).map((sale) => (
+                                            <tr key={sale.sale_id}>
+                                                <td>{sale.sale_number}</td>
+                                                <td>{new Date(sale.sale_date).toLocaleDateString()}</td>
+                                                <td>{sale.customer?.customer_name || 'Walk-in'}</td>
+                                                <td>${sale.total_amount?.toFixed(2)}</td>
+                                                <td>{sale.items_count} items</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
                     </>
                 )}
-                <div style={styles.categoriesSection}>
-    <div style={styles.sectionHeader}>
-        <h3 style={styles.sectionTitle}>Product Categories</h3>
-        {selectedCategory && (
-            <button 
-                onClick={() => setSelectedCategory(null)} 
-                style={styles.showAllButton}
-            >
-                Show All Products
-            </button>
-        )}
-    </div>
-    <div style={styles.categoryList}>
-        {categories.map((cat) => {
-            const categoryId = cat.category_id || cat.id;
-            const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
-            return (
-                <div 
-                    key={categoryId} 
-                    style={{
-                        ...styles.categoryCard,
-                        ...(selectedCategory === categoryId ? styles.categoryCardActive : {}),
-                        cursor: 'pointer'
-                    }}
-                    onClick={() => setSelectedCategory(categoryId)}
-                >
-                    <h4 style={selectedCategory === categoryId ? { color: 'white' } : {}}>
-                        {cat.category_name || cat.name}
-                    </h4>
-                    <p style={selectedCategory === categoryId ? { color: '#e0e0e0' } : {}}>
-                        {cat.description}
-                    </p>
-                    <small style={{
-                        ...styles.productCount,
-                        ...(selectedCategory === categoryId ? { color: '#e0e0e0' } : {})
-                    }}>
-                        {productCount} product(s)
-                    </small>
-                </div>
-            );
-        })}
-    </div>
-</div>
                 
-                {/* Products Tab */}
+                {/* ========== PRODUCTS TAB ========== */}
                 {activeTab === 'products' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
-                            <h3 style={styles.sectionTitle}>Products</h3>
+                            <h3 style={styles.sectionTitle}>
+                                {selectedCategory 
+                                    ? `Products in ${categories.find(c => (c.category_id || c.id) === selectedCategory)?.category_name || 'Category'}`
+                                    : 'All Products'}
+                            </h3>
                             <button onClick={() => setShowProductForm(true)} style={styles.addButton}>+ Add Product</button>
                         </div>
                         <div style={styles.productTable}>
                             <table style={styles.table}>
                                 <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th>Actions</th></tr></thead>
                                 <tbody>
-    {(selectedCategory 
-        ? products.filter(p => (p.category_id || p.category) === selectedCategory)
-        : products
-    ).map((product) => (
-        <tr key={product.product_id || product.id}>
-            <td>{product.name}</td>
-            <td>${product.price}</td>
-            <td>
-                <span style={{
-                    ...styles.stockBadge, 
-                    backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : 
-                                   product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'
-                }}>
-                    {product.quantity_in_stock}
-                </span>
-            </td>
-            <td>{product.categories?.category_name || 'Uncategorized'}</td>
-            <td>
-                <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>
-                    Delete
-                </button>
-            </td>
-        </tr>
-    ))}
-</tbody>
+                                    {(selectedCategory 
+                                        ? products.filter(p => (p.category_id || p.category) === selectedCategory)
+                                        : products
+                                    ).map((product) => (
+                                        <tr key={product.product_id || product.id}>
+                                            <td>{product.name}</td>
+                                            <td>${product.price}</td>
+                                            <td>
+                                                <span style={{
+                                                    ...styles.stockBadge,
+                                                    backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : 
+                                                                   product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'
+                                                }}>
+                                                    {product.quantity_in_stock}
+                                                </span>
+                                            </td>
+                                            <td>{product.categories?.category_name || 'Uncategorized'}</td>
+                                            <td>
+                                                <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
                             </table>
                         </div>
                     </div>
                 )}
                 
-                {/* Purchases Tab */}
+                {/* ========== PURCHASES TAB ========== */}
                 {activeTab === 'purchases' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
@@ -454,7 +440,7 @@ function App() {
                     </div>
                 )}
                 
-                {/* Sales Tab */}
+                {/* ========== SALES TAB ========== */}
                 {activeTab === 'sales' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
@@ -482,7 +468,7 @@ function App() {
                 )}
             </div>
             
-            {/* Product Modal */}
+            {/* ========== PRODUCT MODAL ========== */}
             {showProductForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -505,7 +491,7 @@ function App() {
                 </div>
             )}
             
-            {/* Purchase Modal */}
+            {/* ========== PURCHASE MODAL ========== */}
             {showPurchaseForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
@@ -540,7 +526,7 @@ function App() {
                 </div>
             )}
             
-            {/* Sale Modal */}
+            {/* ========== SALE MODAL ========== */}
             {showSaleForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
@@ -582,6 +568,7 @@ function App() {
     );
 }
 
+// ========== STYLES ==========
 const styles = {
     container: { minHeight: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#f0f2f5', fontFamily: 'Arial, sans-serif' },
     loginBox: { backgroundColor: 'white', padding: '40px', borderRadius: '8px', boxShadow: '0 2px 10px rgba(0,0,0,0.1)', width: '400px', textAlign: 'center' },
@@ -601,66 +588,26 @@ const styles = {
     userName: { color: '#666' },
     userRole: { padding: '4px 8px', backgroundColor: '#007bff', color: 'white', borderRadius: '4px', fontSize: '12px' },
     logoutButton: { padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-    tabs: { display: 'flex', gap: '10px', padding: '20px 30px 0 30px', backgroundColor: '#f0f2f5' },
-    tab: { padding: '10px 20px', backgroundColor: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer', fontSize: '16px' },
-        tab: {
-        padding: '10px 20px',
-        backgroundColor: 'white',
-        border: 'none',
-        borderRadius: '8px 8px 0 0',
-        cursor: 'pointer',
-        fontSize: '16px'
-    },
-    mobileSelect: {
-        width: '100%',
-        padding: '12px',
-        fontSize: '16px',
-        borderRadius: '8px',
-        border: '1px solid #ddd',
-        backgroundColor: 'white',
-        marginBottom: '10px'
-    },
-    activeTab: {
-        backgroundColor: '#007bff',
-        color: 'white'
-    },
-        showAllButton: {
-        padding: '6px 12px',
-        backgroundColor: '#6c757d',
-        color: 'white',
-        border: 'none',
-        borderRadius: '4px',
-        cursor: 'pointer',
-        fontSize: '12px'
-    },
-    categoryCardActive: {
-        backgroundColor: '#007bff',
-        color: 'white',
-        border: '1px solid #007bff'
-    },
-    productCount: {
-        display: 'block',
-        marginTop: '8px',
-        fontSize: '11px',
-        color: '#666'
-    },
+    tabs: { display: 'flex', gap: '10px', padding: '20px 30px 0 30px', backgroundColor: '#f0f2f5', overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
+    tab: { padding: '10px 20px', backgroundColor: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer', fontSize: '16px', whiteSpace: 'nowrap' },
+    mobileSelect: { width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white', marginBottom: '10px' },
     activeTab: { backgroundColor: '#007bff', color: 'white' },
-    dashboard: { padding: '30px' },
+    dashboard: { padding: '15px' },
     statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' },
     statCard: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
     statNumber: { fontSize: '32px', fontWeight: 'bold', color: '#007bff', margin: '10px 0 0 0' },
     categoriesSection: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '30px' },
     sectionTitle: { marginTop: 0, marginBottom: '20px', color: '#333' },
+    sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' },
     categoryList: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px' },
-    categoryCard: { padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '4px', border: '1px solid #e9ecef' },
+    categoryCard: { padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', transition: 'all 0.3s ease' },
+    categoryCardActive: { backgroundColor: '#007bff', color: 'white', border: '1px solid #007bff' },
+    productCount: { display: 'block', marginTop: '8px', fontSize: '11px', color: '#666' },
+    showAllButton: { padding: '6px 12px', backgroundColor: '#6c757d', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' },
     productsSection: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '30px' },
-    sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
     addButton: { padding: '8px 16px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-     productTable: {
-        overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch'
-    },
-    table: { width: '100%', borderCollapse: 'collapse' },
+    productTable: { overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
+    table: { width: '100%', borderCollapse: 'collapse', minWidth: '600px' },
     stockBadge: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontWeight: 'bold', fontSize: '12px' },
     deleteButton: { padding: '4px 8px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
     modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
@@ -670,9 +617,9 @@ const styles = {
     closeButton: { background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' },
     modalInput: { width: '100%', padding: '10px', marginBottom: '15px', border: '1px solid #ddd', borderRadius: '4px', boxSizing: 'border-box' },
     submitButton: { width: '100%', padding: '10px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-    purchaseItemRow: { display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center' },
-    itemSelect: { flex: 2, padding: '8px', border: '1px solid #ddd', borderRadius: '4px' },
-    itemInput: { flex: 1, padding: '8px', border: '1px solid #ddd', borderRadius: '4px' },
+    purchaseItemRow: { display: 'flex', gap: '10px', marginBottom: '10px', alignItems: 'center', flexWrap: 'wrap' },
+    itemSelect: { flex: 2, padding: '8px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '120px' },
+    itemInput: { flex: 1, padding: '8px', border: '1px solid #ddd', borderRadius: '4px', minWidth: '80px' },
     removeButton: { padding: '8px 12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' },
     addItemButton: { width: '100%', padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '15px' }
 };
