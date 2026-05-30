@@ -82,38 +82,43 @@ function App() {
 
     // ========== LOAD ALL DATA ==========
     const loadAllData = async () => {
-        try {
-            const catRes = await fetch(`${API_URL}/api/v1/categories`);
-            const catData = await catRes.json();
-            if (catData.success) setCategories(catData.data || []);
-            
-            const prodRes = await fetch(`${API_URL}/api/v1/products`);
-            const prodData = await prodRes.json();
-            if (prodData.success) setProducts(prodData.data || []);
-            
-            const supRes = await fetch(`${API_URL}/api/v1/suppliers`);
-            const supData = await supRes.json();
-            if (supData.success) setSuppliers(supData.data || []);
-            
-            const custRes = await fetch(`${API_URL}/api/v1/customers`);
-            const custData = await custRes.json();
-            if (custData.success) setCustomers(custData.data || []);
-            
-            const purRes = await fetch(`${API_URL}/api/v1/purchases`);
-            const purData = await purRes.json();
-            if (purData.success) setPurchases(purData.data || []);
-            
-            const saleRes = await fetch(`${API_URL}/api/v1/sales`);
-            const saleData = await saleRes.json();
-            if (saleData.success) setSales(saleData.data || []);
-            
-            const statsRes = await fetch(`${API_URL}/api/v1/sales/stats`);
-            const statsData = await statsRes.json();
-            if (statsData.success) setSalesStats(statsData.data);
-            
-        } catch (error) {
-            console.error('Error loading data:', error);
-        }
+    try {
+        const token = localStorage.getItem('token');
+        
+        const headers = { 'Authorization': `Bearer ${token}` };
+        
+        const catRes = await fetch(`${API_URL}/api/v1/categories`, { headers });
+        const catData = await catRes.json();
+        if (catData.success) setCategories(catData.data || []);
+        
+        const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
+        const prodData = await prodRes.json();
+        if (prodData.success) setProducts(prodData.data || []);
+        
+        const supRes = await fetch(`${API_URL}/api/v1/suppliers`, { headers });
+        const supData = await supRes.json();
+        if (supData.success) setSuppliers(supData.data || []);
+        
+        const custRes = await fetch(`${API_URL}/api/v1/customers`, { headers });
+        const custData = await custRes.json();
+        if (custData.success) setCustomers(custData.data || []);
+        
+        const purRes = await fetch(`${API_URL}/api/v1/purchases`, { headers });
+        const purData = await purRes.json();
+        if (purData.success) setPurchases(purData.data || []);
+        
+        const saleRes = await fetch(`${API_URL}/api/v1/sales`, { headers });
+        const saleData = await saleRes.json();
+        if (saleData.success) setSales(saleData.data || []);
+        
+        const statsRes = await fetch(`${API_URL}/api/v1/sales/stats`, { headers });
+        const statsData = await statsRes.json();
+        if (statsData.success) setSalesStats(statsData.data);
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+    }
+};
     };
 
     // ========== REPORT FUNCTIONS (ADMIN ONLY) ==========
