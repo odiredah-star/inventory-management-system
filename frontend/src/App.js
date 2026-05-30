@@ -4,9 +4,9 @@ const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
 
 // HARDCODED CATEGORIES - These will ALWAYS show
 const HARDCODED_CATEGORIES = [
-    { category_id: '1', category_name: 'Electronics', description: 'Electronic devices and accessories' },
-    { category_id: '2', category_name: 'Clothing', description: 'Apparel and fashion items' },
-    { category_id: '3', category_name: 'Furniture', description: 'Home and office furniture' }
+    { id: '1', name: 'Electronics', description: 'Electronic devices and accessories' },
+    { id: '2', name: 'Clothing', description: 'Apparel and fashion items' },
+    { id: '3', name: 'Furniture', description: 'Home and office furniture' }
 ];
 
 function App() {
@@ -26,12 +26,14 @@ function App() {
     const [purchases, setPurchases] = useState([]);
     const [sales, setSales] = useState([]);
     const [salesStats, setSalesStats] = useState({ totalSales: 0, todaySales: 0, saleCount: 0 });
+    const [users, setUsers] = useState([]);
     
     // ========== UI STATES ==========
     const [activeTab, setActiveTab] = useState('dashboard');
     const [showProductForm, setShowProductForm] = useState(false);
     const [showPurchaseForm, setShowPurchaseForm] = useState(false);
     const [showSaleForm, setShowSaleForm] = useState(false);
+    const [showUserForm, setShowUserForm] = useState(false);
     const [selectedCategoryPage, setSelectedCategoryPage] = useState(null);
     const [showReportModal, setShowReportModal] = useState(false);
     const [reportType, setReportType] = useState('inventory');
@@ -47,6 +49,7 @@ function App() {
     
     // ========== FORM STATES ==========
     const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity_in_stock: '', category_id: '' });
+    const [newUser, setNewUser] = useState({ full_name: '', email: '', password: '', role: 'staff' });
     const [newPurchase, setNewPurchase] = useState({ supplier_id: '', items: [{ product_id: '', quantity: '', cost_price: '' }] });
     const [newSale, setNewSale] = useState({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
 
@@ -93,8 +96,6 @@ function App() {
             const token = localStorage.getItem('token');
             const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
             
-            // Categories are already set to HARDCODED_CATEGORIES
-            
             // Load products
             const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
             const prodData = await prodRes.json();
@@ -125,8 +126,58 @@ function App() {
             const statsData = await statsRes.json();
             if (statsData.success) setSalesStats(statsData.data);
             
+            // Load users (admin only)
+            if (user?.role === 'admin') {
+                const usersRes = await fetch(`${API_URL}/api/v1/users`, { headers });
+                const usersData = await usersRes.json();
+                if (usersData.success) setUsers(usersData.data);
+            }
+            
         } catch (error) {
             console.error('Error loading data:', error);
+        }
+    };
+
+    // ========== USER MANAGEMENT FUNCTIONS ==========
+    const handleAddUser = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`${API_URL}/api/v1/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(newUser)
+            });
+            const data = await response.json();
+            if (data.success) {
+                setShowUserForm(false);
+                setNewUser({ full_name: '', email: '', password: '', role: 'staff' });
+                loadAllData();
+                setMessage('User added successfully!');
+            } else {
+                setMessage(data.error);
+            }
+        } catch (error) {
+            setMessage('Error: ' + error.message);
+        }
+    };
+
+    const handleDeleteUser = async (userId, userEmail) => {
+        if (userEmail === 'admin@inventory.com') {
+            setMessage('Cannot delete master admin account');
+            return;
+        }
+        if (!window.confirm('Delete this user?')) return;
+        const token = localStorage.getItem('token');
+        try {
+            await fetch(`${API_URL}/api/v1/users/${userId}`, { 
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            loadAllData();
+            setMessage('User deleted');
+        } catch (error) {
+            setMessage('Error: ' + error.message);
         }
     };
 
@@ -158,13 +209,11 @@ function App() {
             filename = 'sales-report.csv';
         }
         
-        // Create CSV content
         let csvContent = headers.join(',') + '\n';
         data.forEach(row => {
             csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
         });
         
-        // Download CSV
         const blob = new Blob([csvContent], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -435,8 +484,8 @@ function App() {
 
     // Get category name by ID
     const getCategoryName = (categoryId) => {
-        const category = categories.find(c => (c.category_id || c.id) === categoryId);
-        return category ? (category.category_name || category.name) : 'Category';
+        const category = categories.find(c => (c.id || c.category_id) === categoryId);
+        return category ? (category.name || category.category_name) : 'Category';
     };
 
     // ========== LOGIN SCREEN ==========
@@ -539,7 +588,7 @@ function App() {
                                         ))
                                     )}
                                 </tbody>
-                            </table>
+                            </tr>
                         </div>
                     </div>
                 </div>
@@ -583,6 +632,7 @@ function App() {
                         <option value="products">Products</option>
                         <option value="purchases">Purchases</option>
                         <option value="sales">Sales</option>
+                        {user?.role === 'admin' && <option value="users">Users</option>}
                     </select>
                 ) : (
                     <>
@@ -590,6 +640,9 @@ function App() {
                         <button onClick={() => setActiveTab('products')} style={{...styles.tab, ...(activeTab === 'products' ? styles.activeTab : {})}}>Products</button>
                         <button onClick={() => setActiveTab('purchases')} style={{...styles.tab, ...(activeTab === 'purchases' ? styles.activeTab : {})}}>Purchases</button>
                         <button onClick={() => setActiveTab('sales')} style={{...styles.tab, ...(activeTab === 'sales' ? styles.activeTab : {})}}>Sales</button>
+                        {user?.role === 'admin' && (
+                            <button onClick={() => setActiveTab('users')} style={{...styles.tab, ...(activeTab === 'users' ? styles.activeTab : {})}}>Users</button>
+                        )}
                     </>
                 )}
             </div>
@@ -616,8 +669,8 @@ function App() {
                             <h3 style={styles.sectionTitle}>Product Categories</h3>
                             <div style={styles.categoryList}>
                                 {categories.map((cat) => {
-                                    const categoryId = cat.category_id || cat.id;
-                                    const categoryName = cat.category_name || cat.name;
+                                    const categoryId = cat.id || cat.category_id;
+                                    const categoryName = cat.name || cat.category_name;
                                     const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
                                     return (
                                         <div 
@@ -707,7 +760,7 @@ function App() {
                                                     </>
                                                 )}
                                             </td>
-                                        </tr>
+                                        </td>
                                     ))}
                                 </tbody>
                             </table>
@@ -782,6 +835,59 @@ function App() {
                         </div>
                     </div>
                 )}
+                
+                {activeTab === 'users' && user?.role === 'admin' && (
+                    <div style={styles.productsSection}>
+                        <div style={styles.sectionHeader}>
+                            <h3 style={styles.sectionTitle}>User Management</h3>
+                            <button onClick={() => setShowUserForm(true)} style={styles.addButton}>+ Add User</button>
+                        </div>
+                        <div style={styles.productTable}>
+                            <table style={styles.table}>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {users.map((u) => (
+                                        <tr key={u.id}>
+                                            <td>{u.full_name}</td>
+                                            <td>{u.email}</td>
+                                            <td>
+                                                <span style={{
+                                                    ...styles.roleBadge,
+                                                    backgroundColor: u.role === 'admin' ? '#dc3545' : '#28a745'
+                                                }}>
+                                                    {u.role}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                <span style={{
+                                                    ...styles.statusBadge,
+                                                    backgroundColor: u.status === 'active' ? '#28a745' : '#dc3545'
+                                                }}>
+                                                    {u.status}
+                                                </span>
+                                            </td>
+                                            <td>{new Date(u.created_at).toLocaleDateString()}</td>
+                                            <td>
+                                                {u.email !== 'admin@inventory.com' && (
+                                                    <button onClick={() => handleDeleteUser(u.id, u.email)} style={styles.deleteButton}>Delete</button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
             
             {/* Add Product Modal */}
@@ -799,8 +905,8 @@ function App() {
                             <select value={newProduct.category_id} onChange={(e) => setNewProduct({...newProduct, category_id: e.target.value})} style={styles.modalInput} required>
                                 <option value="">Select Category</option>
                                 {categories.map((cat) => (
-                                    <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
-                                        {cat.category_name || cat.name}
+                                    <option key={cat.id || cat.category_id} value={cat.id || cat.category_id}>
+                                        {cat.name || cat.category_name}
                                     </option>
                                 ))}
                             </select>
@@ -825,12 +931,34 @@ function App() {
                             <select value={editProductData.category_id} onChange={(e) => setEditProductData({...editProductData, category_id: e.target.value})} style={styles.modalInput} required>
                                 <option value="">Select Category</option>
                                 {categories.map((cat) => (
-                                    <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
-                                        {cat.category_name || cat.name}
+                                    <option key={cat.id || cat.category_id} value={cat.id || cat.category_id}>
+                                        {cat.name || cat.category_name}
                                     </option>
                                 ))}
                             </select>
                             <button type="submit" style={styles.submitButton}>Update Product</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+            
+            {/* User Form Modal */}
+            {showUserForm && user?.role === 'admin' && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modal}>
+                        <div style={styles.modalHeader}>
+                            <h3>Add New User</h3>
+                            <button onClick={() => setShowUserForm(false)} style={styles.closeButton}>×</button>
+                        </div>
+                        <form onSubmit={handleAddUser}>
+                            <input type="text" placeholder="Full Name" value={newUser.full_name} onChange={(e) => setNewUser({...newUser, full_name: e.target.value})} style={styles.modalInput} required />
+                            <input type="email" placeholder="Email" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} style={styles.modalInput} required />
+                            <input type="password" placeholder="Password" value={newUser.password} onChange={(e) => setNewUser({...newUser, password: e.target.value})} style={styles.modalInput} required />
+                            <select value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})} style={styles.modalInput}>
+                                <option value="staff">Staff</option>
+                                <option value="admin">Admin</option>
+                            </select>
+                            <button type="submit" style={styles.submitButton}>Add User</button>
                         </form>
                     </div>
                 </div>
@@ -922,7 +1050,7 @@ function App() {
                 </div>
             )}
             
-            {/* Report Modal with CSV Export */}
+            {/* Report Modal */}
             {showReportModal && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -980,8 +1108,8 @@ const styles = {
     reportOptions: { display: 'flex', flexDirection: 'column', gap: '15px', padding: '10px' },
     reportSubtitle: { fontSize: '14px', fontWeight: 'bold', margin: '0 0 8px 0', color: '#555', textAlign: 'center' },
     reportButtonGroup: { display: 'flex', gap: '10px', justifyContent: 'center' },
-    reportOptionButton: { padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', transition: 'all 0.3s ease' },
-    reportOptionButtonCSV: { padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', transition: 'all 0.3s ease' },
+    reportOptionButton: { padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
+    reportOptionButtonCSV: { padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px' },
     statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' },
     statCard: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
     statNumber: { fontSize: '32px', fontWeight: 'bold', color: '#007bff', margin: '10px 0 0 0' },
@@ -999,6 +1127,8 @@ const styles = {
     stockBadge: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontWeight: 'bold', fontSize: '12px' },
     editButton: { padding: '4px 8px', backgroundColor: '#ffc107', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' },
     deleteButton: { padding: '4px 8px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
+    roleBadge: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontSize: '12px', display: 'inline-block' },
+    statusBadge: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontSize: '12px', display: 'inline-block' },
     modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
     modal: { backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '400px', maxWidth: '90%' },
     modalLarge: { backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '600px', maxWidth: '90%', maxHeight: '80vh', overflowY: 'auto' },
