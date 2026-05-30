@@ -218,6 +218,26 @@ app.get('/api/v1/sales/stats', (req, res) => {
     res.json({ success: true, data: { totalSales, todaySales, saleCount: sales.length } });
 });
 
+// Update product (Edit)
+app.put('/api/v1/products/:id', (req, res) => {
+    const { id } = req.params;
+    const { name, price, quantity_in_stock, category_id } = req.body;
+    
+    const productIndex = products.findIndex(p => p.id === id);
+    if (productIndex === -1) {
+        return res.status(404).json({ success: false, error: 'Product not found' });
+    }
+    
+    products[productIndex] = {
+        ...products[productIndex],
+        name,
+        price: parseFloat(price),
+        quantity_in_stock: parseInt(quantity_in_stock),
+        category_id
+    };
+    
+    res.json({ success: true, message: 'Product updated', data: products[productIndex] });
+});
 // START SERVER
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);

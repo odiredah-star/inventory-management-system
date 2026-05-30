@@ -25,7 +25,16 @@ function App() {
     const [showProductForm, setShowProductForm] = useState(false);
     const [showPurchaseForm, setShowPurchaseForm] = useState(false);
     const [showSaleForm, setShowSaleForm] = useState(false);
-    const [selectedCategoryPage, setSelectedCategoryPage] = useState(null); // For category page view
+    const [selectedCategoryPage, setSelectedCategoryPage] = useState(null);
+    
+    // ========== EDIT PRODUCT STATES ==========
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [editProductData, setEditProductData] = useState({
+        name: '',
+        price: '',
+        quantity_in_stock: '',
+        category_id: ''
+    });
     
     // ========== FORM STATES ==========
     const [newProduct, setNewProduct] = useState({ name: '', price: '', quantity_in_stock: '', category_id: '' });
@@ -125,6 +134,8 @@ function App() {
                 setNewProduct({ name: '', price: '', quantity_in_stock: '', category_id: '' });
                 loadAllData();
                 setMessage('Product added!');
+            } else {
+                setMessage('Failed to add product');
             }
         } catch (error) {
             setMessage('Error: ' + error.message);
@@ -137,6 +148,45 @@ function App() {
             await fetch(`${API_URL}/api/v1/products/${productId}`, { method: 'DELETE' });
             loadAllData();
             setMessage('Product deleted');
+        } catch (error) {
+            setMessage('Error: ' + error.message);
+        }
+    };
+
+    // ========== EDIT PRODUCT FUNCTIONS ==========
+    const handleEditProduct = (product) => {
+        setEditingProduct(product);
+        setEditProductData({
+            name: product.name,
+            price: product.price,
+            quantity_in_stock: product.quantity_in_stock,
+            category_id: product.category_id || product.category
+        });
+    };
+
+    const handleUpdateProduct = async (e) => {
+        e.preventDefault();
+        try {
+            const productId = editingProduct.product_id || editingProduct.id;
+            const response = await fetch(`${API_URL}/api/v1/products/${productId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: editProductData.name,
+                    price: parseFloat(editProductData.price),
+                    quantity_in_stock: parseInt(editProductData.quantity_in_stock),
+                    category_id: editProductData.category_id
+                })
+            });
+            const data = await response.json();
+            if (data.success) {
+                setEditingProduct(null);
+                setEditProductData({ name: '', price: '', quantity_in_stock: '', category_id: '' });
+                loadAllData();
+                setMessage('Product updated successfully!');
+            } else {
+                setMessage('Update failed: ' + data.error);
+            }
         } catch (error) {
             setMessage('Error: ' + error.message);
         }
@@ -157,6 +207,8 @@ function App() {
                 setNewPurchase({ supplier_id: '', items: [{ product_id: '', quantity: '', cost_price: '' }] });
                 loadAllData();
                 setMessage('Purchase recorded!');
+            } else {
+                setMessage('Failed to record purchase');
             }
         } catch (error) {
             setMessage('Error: ' + error.message);
@@ -198,7 +250,7 @@ function App() {
                 loadAllData();
                 setMessage('Sale recorded!');
             } else {
-                setMessage(data.error);
+                setMessage(data.error || 'Failed to record sale');
             }
         } catch (error) {
             setMessage('Error: ' + error.message);
@@ -271,7 +323,7 @@ function App() {
         );
     }
 
-    // ========== CATEGORY PAGE VIEW (When a category is clicked) ==========
+    // ========== CATEGORY PAGE VIEW ==========
     if (selectedCategoryPage) {
         const categoryProducts = getFilteredProducts();
         const categoryName = getCategoryName(selectedCategoryPage);
@@ -315,7 +367,7 @@ function App() {
                                 <tbody>
                                     {categoryProducts.length === 0 ? (
                                         <tr>
-                                            <td colSpan="5" style={styles.noData}>No products in this category yet.</td>
+                                            <td colSpan="5" style={styles.noData}>No products in this category yet. Add one!</td>
                                         </tr>
                                     ) : (
                                         categoryProducts.map((product) => (
@@ -333,9 +385,8 @@ function App() {
                                                 </td>
                                                 <td>{categoryName}</td>
                                                 <td>
-                                                    <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>
-                                                        Delete
-                                                    </button>
+                                                    <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
+                                                    <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
                                                 </td>
                                             </tr>
                                         ))
@@ -346,16 +397,18 @@ function App() {
                     </div>
                 </div>
                 
-                {/* Product Modal */}
+                {/* Add Product Modal in Category Page */}
                 {showProductForm && (
                     <div style={styles.modalOverlay}>
                         <div style={styles.modal}>
-                            <div style={styles.modalHeader}><h3>Add Product to {categoryName}</h3><button onClick={() => setShowProductForm(false)} style={styles.closeButton}>×</button></div>
+                            <div style={styles.modalHeader}>
+                                <h3>Add Product to {categoryName}</h3>
+                                <button onClick={() => setShowProductForm(false)} style={styles.closeButton}>×</button>
+                            </div>
                             <form onSubmit={handleAddProduct}>
                                 <input type="text" placeholder="Product Name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} style={styles.modalInput} required />
                                 <input type="number" placeholder="Price" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} style={styles.modalInput} required />
                                 <input type="number" placeholder="Initial Stock" value={newProduct.quantity_in_stock} onChange={(e) => setNewProduct({...newProduct, quantity_in_stock: e.target.value})} style={styles.modalInput} required />
-                                <input type="hidden" value={selectedCategoryPage} />
                                 <button type="submit" style={styles.submitButton}>Add Product</button>
                             </form>
                         </div>
@@ -405,7 +458,6 @@ function App() {
                             <div style={styles.statCard}><h3>Transactions</h3><p style={styles.statNumber}>{salesStats.saleCount || 0}</p></div>
                         </div>
                         
-                        {/* Clickable Categories Section - Takes you to category page */}
                         <div style={styles.categoriesSection}>
                             <h3 style={styles.sectionTitle}>Product Categories</h3>
                             <div style={styles.categoryList}>
@@ -433,7 +485,15 @@ function App() {
                             <h3 style={styles.sectionTitle}>Recent Sales</h3>
                             <div style={styles.productTable}>
                                 <table style={styles.table}>
-                                    <thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Total</th><th>Items</th></tr></thead>
+                                    <thead>
+                                        <tr>
+                                            <th>Invoice #</th>
+                                            <th>Date</th>
+                                            <th>Customer</th>
+                                            <th>Total</th>
+                                            <th>Items</th>
+                                        </tr>
+                                    </thead>
                                     <tbody>
                                         {sales.slice(0, 5).map((sale) => (
                                             <tr key={sale.sale_id}>
@@ -459,16 +519,35 @@ function App() {
                         </div>
                         <div style={styles.productTable}>
                             <table style={styles.table}>
-                                <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th>Actions</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Price</th>
+                                        <th>Stock</th>
+                                        <th>Category</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     {products.map((product) => (
                                         <tr key={product.product_id || product.id}>
                                             <td>{product.name}</td>
                                             <td>${product.price}</td>
-                                            <td><span style={{...styles.stockBadge, backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'}}>{product.quantity_in_stock}</span></td>
-                                            <td>{product.categories?.category_name || 'Uncategorized'}</td>
-                                            <td><button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button></td>
-                                        </tr>
+                                            <td>
+                                                <span style={{
+                                                    ...styles.stockBadge,
+                                                    backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : 
+                                                                   product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'
+                                                }}>
+                                                    {product.quantity_in_stock}
+                                                </span>
+                                             </td>
+                                            <td>{product.categories?.category_name || 'Uncategorized'} </td>
+                                            <td>
+                                                <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
+                                                <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                             </td>
+                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -484,16 +563,24 @@ function App() {
                         </div>
                         <div style={styles.productTable}>
                             <table style={styles.table}>
-                                <thead><tr><th>Purchase #</th><th>Supplier</th><th>Date</th><th>Total Cost</th><th>Items</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>Purchase #</th>
+                                        <th>Supplier</th>
+                                        <th>Date</th>
+                                        <th>Total Cost</th>
+                                        <th>Items</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     {purchases.map((purchase) => (
                                         <tr key={purchase.purchase_id}>
-                                            <td>{purchase.purchase_number}</td>
-                                            <td>{purchase.suppliers?.supplier_name || 'Unknown'}</td>
-                                            <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
-                                            <td>${purchase.total_cost?.toFixed(2)}</td>
+                                            <td>{purchase.purchase_number} </td>
+                                            <td>{purchase.suppliers?.supplier_name || 'Unknown'} </td>
+                                            <td>{new Date(purchase.purchase_date).toLocaleDateString()} </td>
+                                            <td>${purchase.total_cost?.toFixed(2)} </td>
                                             <td>{purchase.items_count} items</td>
-                                        </tr>
+                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -509,7 +596,16 @@ function App() {
                         </div>
                         <div style={styles.productTable}>
                             <table style={styles.table}>
-                                <thead><tr><th>Invoice #</th><th>Date</th><th>Customer</th><th>Total</th><th>Payment</th><th>Items</th></tr></thead>
+                                <thead>
+                                    <tr>
+                                        <th>Invoice #</th>
+                                        <th>Date</th>
+                                        <th>Customer</th>
+                                        <th>Total</th>
+                                        <th>Payment</th>
+                                        <th>Items</th>
+                                    </tr>
+                                </thead>
                                 <tbody>
                                     {sales.map((sale) => (
                                         <tr key={sale.sale_id}>
@@ -519,7 +615,7 @@ function App() {
                                             <td>${sale.total_amount?.toFixed(2)}</td>
                                             <td>{sale.payment_method}</td>
                                             <td>{sale.items_count} items</td>
-                                        </tr>
+                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -528,11 +624,14 @@ function App() {
                 )}
             </div>
             
-            {/* Product Modal */}
-            {showProductForm && (
+            {/* Add Product Modal */}
+            {showProductForm && !selectedCategoryPage && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
-                        <div style={styles.modalHeader}><h3>Add Product</h3><button onClick={() => setShowProductForm(false)} style={styles.closeButton}>×</button></div>
+                        <div style={styles.modalHeader}>
+                            <h3>Add Product</h3>
+                            <button onClick={() => setShowProductForm(false)} style={styles.closeButton}>×</button>
+                        </div>
                         <form onSubmit={handleAddProduct}>
                             <input type="text" placeholder="Product Name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} style={styles.modalInput} required />
                             <input type="number" placeholder="Price" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} style={styles.modalInput} required />
@@ -540,10 +639,38 @@ function App() {
                             <select value={newProduct.category_id} onChange={(e) => setNewProduct({...newProduct, category_id: e.target.value})} style={styles.modalInput} required>
                                 <option value="">Select Category</option>
                                 {categories.map((cat) => (
-                                    <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>{cat.category_name || cat.name}</option>
+                                    <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
+                                        {cat.category_name || cat.name}
+                                    </option>
                                 ))}
                             </select>
                             <button type="submit" style={styles.submitButton}>Add Product</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+            
+            {/* Edit Product Modal */}
+            {editingProduct && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modal}>
+                        <div style={styles.modalHeader}>
+                            <h3>Edit Product</h3>
+                            <button onClick={() => setEditingProduct(null)} style={styles.closeButton}>×</button>
+                        </div>
+                        <form onSubmit={handleUpdateProduct}>
+                            <input type="text" placeholder="Product Name" value={editProductData.name} onChange={(e) => setEditProductData({...editProductData, name: e.target.value})} style={styles.modalInput} required />
+                            <input type="number" placeholder="Price" value={editProductData.price} onChange={(e) => setEditProductData({...editProductData, price: e.target.value})} style={styles.modalInput} required />
+                            <input type="number" placeholder="Stock Quantity" value={editProductData.quantity_in_stock} onChange={(e) => setEditProductData({...editProductData, quantity_in_stock: e.target.value})} style={styles.modalInput} required />
+                            <select value={editProductData.category_id} onChange={(e) => setEditProductData({...editProductData, category_id: e.target.value})} style={styles.modalInput} required>
+                                <option value="">Select Category</option>
+                                {categories.map((cat) => (
+                                    <option key={cat.category_id || cat.id} value={cat.category_id || cat.id}>
+                                        {cat.category_name || cat.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <button type="submit" style={styles.submitButton}>Update Product</button>
                         </form>
                     </div>
                 </div>
@@ -553,12 +680,17 @@ function App() {
             {showPurchaseForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
-                        <div style={styles.modalHeader}><h3>New Purchase</h3><button onClick={() => setShowPurchaseForm(false)} style={styles.closeButton}>×</button></div>
+                        <div style={styles.modalHeader}>
+                            <h3>New Purchase</h3>
+                            <button onClick={() => setShowPurchaseForm(false)} style={styles.closeButton}>×</button>
+                        </div>
                         <form onSubmit={handleAddPurchase}>
                             <select value={newPurchase.supplier_id} onChange={(e) => setNewPurchase({...newPurchase, supplier_id: e.target.value})} style={styles.modalInput} required>
                                 <option value="">Select Supplier</option>
                                 {suppliers.map((sup) => (
-                                    <option key={sup.supplier_id || sup.id} value={sup.supplier_id || sup.id}>{sup.supplier_name || sup.name}</option>
+                                    <option key={sup.supplier_id || sup.id} value={sup.supplier_id || sup.id}>
+                                        {sup.supplier_name || sup.name}
+                                    </option>
                                 ))}
                             </select>
                             <h4>Items:</h4>
@@ -572,7 +704,9 @@ function App() {
                                     </select>
                                     <input type="number" placeholder="Qty" value={item.quantity} onChange={(e) => handlePurchaseItemChange(idx, 'quantity', e.target.value)} style={styles.itemInput} required />
                                     <input type="number" placeholder="Cost" value={item.cost_price} onChange={(e) => handlePurchaseItemChange(idx, 'cost_price', e.target.value)} style={styles.itemInput} required />
-                                    {newPurchase.items.length > 1 && <button type="button" onClick={() => removePurchaseItem(idx)} style={styles.removeButton}>×</button>}
+                                    {newPurchase.items.length > 1 && (
+                                        <button type="button" onClick={() => removePurchaseItem(idx)} style={styles.removeButton}>×</button>
+                                    )}
                                 </div>
                             ))}
                             <button type="button" onClick={addPurchaseItem} style={styles.addItemButton}>+ Add Item</button>
@@ -586,12 +720,17 @@ function App() {
             {showSaleForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
-                        <div style={styles.modalHeader}><h3>New Sale</h3><button onClick={() => setShowSaleForm(false)} style={styles.closeButton}>×</button></div>
+                        <div style={styles.modalHeader}>
+                            <h3>New Sale</h3>
+                            <button onClick={() => setShowSaleForm(false)} style={styles.closeButton}>×</button>
+                        </div>
                         <form onSubmit={handleAddSale}>
                             <select value={newSale.customer_id} onChange={(e) => setNewSale({...newSale, customer_id: e.target.value})} style={styles.modalInput}>
                                 <option value="">Walk-in Customer</option>
                                 {customers.map((c) => (
-                                    <option key={c.customer_id || c.id} value={c.customer_id || c.id}>{c.customer_name || c.name}</option>
+                                    <option key={c.customer_id || c.id} value={c.customer_id || c.id}>
+                                        {c.customer_name || c.name}
+                                    </option>
                                 ))}
                             </select>
                             <select value={newSale.payment_method} onChange={(e) => setNewSale({...newSale, payment_method: e.target.value})} style={styles.modalInput}>
@@ -605,11 +744,15 @@ function App() {
                                     <select value={item.product_id} onChange={(e) => handleSaleItemChange(idx, 'product_id', e.target.value)} style={styles.itemSelect} required>
                                         <option value="">Select Product</option>
                                         {products.map((p) => (
-                                            <option key={p.product_id || p.id} value={p.product_id || p.id}>{p.name} (${p.price}) - Stock: {p.quantity_in_stock}</option>
+                                            <option key={p.product_id || p.id} value={p.product_id || p.id}>
+                                                {p.name} (${p.price}) - Stock: {p.quantity_in_stock}
+                                            </option>
                                         ))}
                                     </select>
                                     <input type="number" placeholder="Quantity" value={item.quantity} onChange={(e) => handleSaleItemChange(idx, 'quantity', e.target.value)} style={styles.itemInput} required />
-                                    {newSale.items.length > 1 && <button type="button" onClick={() => removeSaleItem(idx)} style={styles.removeButton}>×</button>}
+                                    {newSale.items.length > 1 && (
+                                        <button type="button" onClick={() => removeSaleItem(idx)} style={styles.removeButton}>×</button>
+                                    )}
                                 </div>
                             ))}
                             <button type="button" onClick={addSaleItem} style={styles.addItemButton}>+ Add Item</button>
@@ -654,7 +797,7 @@ const styles = {
     sectionTitle: { marginTop: 0, marginBottom: '20px', color: '#333' },
     sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '10px' },
     categoryList: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' },
-    categoryCard: { padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', cursor: 'pointer', transition: 'all 0.3s ease', ':hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' } },
+    categoryCard: { padding: '20px', backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef', cursor: 'pointer', transition: 'all 0.3s ease' },
     productCount: { display: 'block', marginTop: '8px', fontSize: '12px', color: '#666' },
     viewProductsButton: { marginTop: '12px', padding: '6px 12px', backgroundColor: '#007bff', color: 'white', textAlign: 'center', borderRadius: '4px', fontSize: '12px', display: 'inline-block' },
     productsSection: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '30px' },
@@ -662,6 +805,7 @@ const styles = {
     productTable: { overflowX: 'auto', WebkitOverflowScrolling: 'touch' },
     table: { width: '100%', borderCollapse: 'collapse', minWidth: '600px' },
     stockBadge: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontWeight: 'bold', fontSize: '12px' },
+    editButton: { padding: '4px 8px', backgroundColor: '#ffc107', color: '#333', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px' },
     deleteButton: { padding: '4px 8px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
     modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
     modal: { backgroundColor: 'white', padding: '30px', borderRadius: '8px', width: '400px', maxWidth: '90%' },
@@ -676,7 +820,6 @@ const styles = {
     removeButton: { padding: '8px 12px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '16px' },
     addItemButton: { width: '100%', padding: '10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', marginBottom: '15px' },
     noData: { textAlign: 'center', padding: '40px', color: '#666' },
-    // Category Page Styles
     categoryPageContainer: { padding: '20px' },
     categoryPageHeader: { marginBottom: '30px', textAlign: 'center' },
     categoryPageTitle: { fontSize: '32px', color: '#333', marginBottom: '10px' },
