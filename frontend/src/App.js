@@ -19,7 +19,7 @@ function App() {
     const [message, setMessage] = useState('');
     
     // ========== DATA STATES ==========
-    const [categories, setCategories] = useState(HARDCODED_CATEGORIES); // Start with hardcoded
+    const [categories, setCategories] = useState(HARDCODED_CATEGORIES);
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -93,7 +93,7 @@ function App() {
             const token = localStorage.getItem('token');
             const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
             
-            // Categories are already set to HARDCODED_CATEGORIES, so they will always show
+            // Categories are already set to HARDCODED_CATEGORIES
             
             // Load products
             const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
@@ -130,7 +130,56 @@ function App() {
         }
     };
 
-    // ========== REPORT FUNCTIONS ==========
+    // ========== CSV EXPORT FUNCTION ==========
+    const exportToCSV = (type) => {
+        let data = [];
+        let headers = [];
+        let filename = '';
+        
+        if (type === 'inventory') {
+            headers = ['Product Name', 'Price', 'Stock', 'Category'];
+            data = products.map(p => [
+                p.name,
+                p.price,
+                p.quantity_in_stock,
+                p.categories?.category_name || 'Uncategorized'
+            ]);
+            filename = 'inventory-report.csv';
+        } else if (type === 'sales') {
+            headers = ['Invoice #', 'Date', 'Customer', 'Total', 'Payment Method', 'Items'];
+            data = sales.map(s => [
+                s.sale_number,
+                new Date(s.sale_date).toLocaleDateString(),
+                s.customer?.customer_name || 'Walk-in',
+                s.total_amount,
+                s.payment_method,
+                s.items_count
+            ]);
+            filename = 'sales-report.csv';
+        }
+        
+        // Create CSV content
+        let csvContent = headers.join(',') + '\n';
+        data.forEach(row => {
+            csvContent += row.map(cell => `"${cell}"`).join(',') + '\n';
+        });
+        
+        // Download CSV
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        setShowReportModal(false);
+        setMessage(`${type === 'inventory' ? 'Inventory' : 'Sales'} report downloaded as CSV!`);
+    };
+
+    // ========== PDF REPORT FUNCTION ==========
     const generatePDF = async () => {
         try {
             const { jsPDF } = await import('jspdf');
@@ -563,7 +612,6 @@ function App() {
                             <div style={styles.statCard}><h3>Transactions</h3><p style={styles.statNumber}>{salesStats.saleCount || 0}</p></div>
                         </div>
                         
-                        {/* PRODUCT CATEGORIES SECTION - THESE WILL ALWAYS SHOW */}
                         <div style={styles.categoriesSection}>
                             <h3 style={styles.sectionTitle}>Product Categories</h3>
                             <div style={styles.categoryList}>
@@ -874,7 +922,7 @@ function App() {
                 </div>
             )}
             
-            {/* Report Modal */}
+            {/* Report Modal with CSV Export */}
             {showReportModal && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -883,8 +931,17 @@ function App() {
                             <button onClick={() => setShowReportModal(false)} style={styles.closeButton}>×</button>
                         </div>
                         <div style={styles.reportOptions}>
-                            <button onClick={() => { setReportType('inventory'); generatePDF(); }} style={styles.reportOptionButton}>📦 Inventory Report</button>
-                            <button onClick={() => { setReportType('sales'); generatePDF(); }} style={styles.reportOptionButton}>💰 Sales Report</button>
+                            <h4 style={styles.reportSubtitle}>📦 Inventory Report</h4>
+                            <div style={styles.reportButtonGroup}>
+                                <button onClick={() => { setReportType('inventory'); generatePDF(); }} style={styles.reportOptionButton}>PDF</button>
+                                <button onClick={() => exportToCSV('inventory')} style={styles.reportOptionButtonCSV}>CSV</button>
+                            </div>
+                            
+                            <h4 style={styles.reportSubtitle}>💰 Sales Report</h4>
+                            <div style={styles.reportButtonGroup}>
+                                <button onClick={() => { setReportType('sales'); generatePDF(); }} style={styles.reportOptionButton}>PDF</button>
+                                <button onClick={() => exportToCSV('sales')} style={styles.reportOptionButtonCSV}>CSV</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -920,8 +977,11 @@ const styles = {
     dashboard: { padding: '15px' },
     reportButtonContainer: { display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' },
     reportButton: { padding: '10px 20px', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
-    reportOptions: { display: 'flex', gap: '15px', justifyContent: 'center', padding: '20px', flexWrap: 'wrap' },
-    reportOptionButton: { padding: '15px 30px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', transition: 'all 0.3s ease' },
+    reportOptions: { display: 'flex', flexDirection: 'column', gap: '15px', padding: '10px' },
+    reportSubtitle: { fontSize: '14px', fontWeight: 'bold', margin: '0 0 8px 0', color: '#555', textAlign: 'center' },
+    reportButtonGroup: { display: 'flex', gap: '10px', justifyContent: 'center' },
+    reportOptionButton: { padding: '10px 20px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', transition: 'all 0.3s ease' },
+    reportOptionButtonCSV: { padding: '10px 20px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '14px', transition: 'all 0.3s ease' },
     statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' },
     statCard: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
     statNumber: { fontSize: '32px', fontWeight: 'bold', color: '#007bff', margin: '10px 0 0 0' },
