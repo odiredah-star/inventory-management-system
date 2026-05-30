@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 // Change this to your backend URL
 // For local testing: http://localhost:5000
 // For production: https://inventory-management-system-1-yji6.onrender.com
-const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
+const API_URL = 'http://localhost:5000';
 
 function App() {
     // ========== AUTHENTICATION STATES ==========
@@ -100,47 +100,44 @@ function App() {
                 setCategories(catData.data);
             }
             
-            // Load products - THIS IS WHERE PRODUCTS COME FROM
+            // Load products
             const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
             const prodData = await prodRes.json();
             if (prodData.success && prodData.data) {
-                console.log('Products loaded:', prodData.data.length);
                 setProducts(prodData.data);
-            } else {
-                console.log('No products or error:', prodData);
             }
             
             // Load suppliers
             const supRes = await fetch(`${API_URL}/api/v1/suppliers`, { headers });
             const supData = await supRes.json();
-            if (supData.success) setSuppliers(supData.data || []);
+            if (supData.success && supData.data) setSuppliers(supData.data);
             
             // Load customers
             const custRes = await fetch(`${API_URL}/api/v1/customers`, { headers });
             const custData = await custRes.json();
-            if (custData.success) setCustomers(custData.data || []);
+            if (custData.success && custData.data) setCustomers(custData.data);
             
             // Load purchases
             const purRes = await fetch(`${API_URL}/api/v1/purchases`, { headers });
             const purData = await purRes.json();
-            if (purData.success) setPurchases(purData.data || []);
+            if (purData.success && purData.data) setPurchases(purData.data);
             
             // Load sales
             const saleRes = await fetch(`${API_URL}/api/v1/sales`, { headers });
             const saleData = await saleRes.json();
-            if (saleData.success) setSales(saleData.data || []);
+            if (saleData.success && saleData.data) setSales(saleData.data);
             
             // Load sales stats
             const statsRes = await fetch(`${API_URL}/api/v1/sales/stats`, { headers });
             const statsData = await statsRes.json();
-            if (statsData.success) setSalesStats(statsData.data);
+            if (statsData.success && statsData.data) setSalesStats(statsData.data);
             
             // Load users (admin only)
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             if (storedUser?.role === 'admin') {
                 const usersRes = await fetch(`${API_URL}/api/v1/users`, { headers });
                 const usersData = await usersRes.json();
-                if (usersData.success) setUsers(usersData.data);
+                if (usersData.success && usersData.data) setUsers(usersData.data);
             }
             
         } catch (error) {
@@ -203,7 +200,7 @@ function App() {
                 p.name,
                 p.price,
                 p.quantity_in_stock,
-                p.categories?.category_name || p.category_name || 'Uncategorized'
+                p.category_name || 'Uncategorized'
             ]);
             filename = 'inventory-report.csv';
         } else if (type === 'sales') {
@@ -211,10 +208,10 @@ function App() {
             data = sales.map(s => [
                 s.sale_number,
                 new Date(s.sale_date).toLocaleDateString(),
-                s.customer?.customer_name || 'Walk-in',
+                s.customer_name || 'Walk-in',
                 s.total_amount,
                 s.payment_method,
-                s.items_count
+                s.items_count || 0
             ]);
             filename = 'sales-report.csv';
         }
@@ -256,7 +253,7 @@ function App() {
                     p.name,
                     `$${p.price}`,
                     p.quantity_in_stock,
-                    p.categories?.category_name || p.category_name || 'Uncategorized'
+                    p.category_name || 'Uncategorized'
                 ]);
                 
                 autoTable(doc, {
@@ -281,10 +278,10 @@ function App() {
                 const tableData = sales.map(s => [
                     s.sale_number,
                     new Date(s.sale_date).toLocaleDateString(),
-                    s.customer?.customer_name || 'Walk-in',
+                    s.customer_name || 'Walk-in',
                     `$${s.total_amount?.toFixed(2)}`,
                     s.payment_method,
-                    `${s.items_count} items`
+                    `${s.items_count || 0} items`
                 ]);
                 
                 autoTable(doc, {
@@ -365,7 +362,7 @@ function App() {
         e.preventDefault();
         const token = localStorage.getItem('token');
         try {
-            const productId = editingProduct.id || editingProduct.product_id;
+            const productId = editingProduct.id;
             const response = await fetch(`${API_URL}/api/v1/products/${productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -489,7 +486,7 @@ function App() {
     // Get filtered products for selected category
     const getFilteredProducts = () => {
         if (!selectedCategoryPage) return [];
-        return products.filter(p => (p.category_id) === selectedCategoryPage);
+        return products.filter(p => p.category_id === selectedCategoryPage);
     };
 
     // Get category name by ID
@@ -617,7 +614,6 @@ function App() {
                                 <input type="text" placeholder="Product Name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} style={styles.modalInput} required />
                                 <input type="number" placeholder="Price" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} style={styles.modalInput} required />
                                 <input type="number" placeholder="Initial Stock" value={newProduct.quantity_in_stock} onChange={(e) => setNewProduct({...newProduct, quantity_in_stock: e.target.value})} style={styles.modalInput} required />
-                                <input type="hidden" value={selectedCategoryPage} />
                                 <button type="submit" style={styles.submitButton}>Add Product</button>
                             </form>
                         </div>
@@ -718,10 +714,10 @@ function App() {
                                             <tr key={sale.id}>
                                                 <td>{sale.sale_number}</td>
                                                 <td>{new Date(sale.sale_date).toLocaleDateString()}</td>
-                                                <td>{sale.customer?.customer_name || 'Walk-in'}</td>
+                                                <td>{sale.customer_name || 'Walk-in'}</td>
                                                 <td>${sale.total_amount?.toFixed(2)}</td>
-                                                <td>{sale.items_count} items\n
-                                            </td>
+                                                <td>{sale.items_count || 0} items</td>
+                                            </tr>
                                         ))}
                                     </tbody>
                                 </table>
@@ -804,10 +800,10 @@ function App() {
                                     {purchases.map((purchase) => (
                                         <tr key={purchase.id}>
                                             <td>{purchase.purchase_number}</td>
-                                            <td>{purchase.suppliers?.supplier_name || 'Unknown'}</td>
+                                            <td>{purchase.supplier_name || 'Unknown'}</td>
                                             <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
                                             <td>${purchase.total_cost?.toFixed(2)}</td>
-                                            <td>{purchase.items_count} items\n
+                                            <td>{purchase.items_count || 0} items</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -839,10 +835,10 @@ function App() {
                                         <tr key={sale.id}>
                                             <td>{sale.sale_number}</td>
                                             <td>{new Date(sale.sale_date).toLocaleDateString()}</td>
-                                            <td>{sale.customer?.customer_name || 'Walk-in'}</td>
+                                            <td>{sale.customer_name || 'Walk-in'}</td>
                                             <td>${sale.total_amount?.toFixed(2)}</td>
                                             <td>{sale.payment_method}</td>
-                                            <td>{sale.items_count} items\n
+                                            <td>{sale.items_count || 0} items</td>
                                         </tr>
                                     ))}
                                 </tbody>
