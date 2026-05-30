@@ -16,6 +16,7 @@ function App() {
     const [purchases, setPurchases] = useState([]);
     const [sales, setSales] = useState([]);
     const [salesStats, setSalesStats] = useState({ totalSales: 0, todaySales: 0, saleCount: 0 });
+    const [selectedCategory, setSelectedCategory] = useState(null);
     
     // UI states
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -306,19 +307,85 @@ function App() {
                             <div style={styles.statCard}><h3>Transactions</h3><p style={styles.statNumber}>{salesStats.saleCount || 0}</p></div>
                         </div>
                         
-                        <div style={styles.categoriesSection}>
-                            <h3 style={styles.sectionTitle}>Product Categories</h3>
-                            <div style={styles.categoryList}>
-                                {categories.map((cat) => (
-                                    <div key={cat.category_id || cat.id} style={styles.categoryCard}>
-                                        <h4>{cat.category_name || cat.name}</h4>
-                                        <p>{cat.description}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                       <div style={styles.categoriesSection}>
+    <div style={styles.sectionHeader}>
+        <h3 style={styles.sectionTitle}>Product Categories</h3>
+        {selectedCategory && (
+            <button 
+                onClick={() => setSelectedCategory(null)} 
+                style={styles.showAllButton}
+            >
+                Show All Products
+            </button>
+        )}
+    </div>
+    <div style={styles.categoryList}>
+        {categories.map((cat) => {
+            const categoryId = cat.category_id || cat.id;
+            const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
+            return (
+                <div 
+                    key={categoryId} 
+                    style={{
+                        ...styles.categoryCard,
+                        ...(selectedCategory === categoryId ? styles.categoryCardActive : {}),
+                        cursor: 'pointer'
+                    }}
+                    onClick={() => setSelectedCategory(categoryId)}
+                >
+                    <h4>{cat.category_name || cat.name}</h4>
+                    <p>{cat.description}</p>
+                    <small style={styles.productCount}>{productCount} product(s)</small>
+                </div>
+            );
+        })}
+    </div>
+</div>
                     </>
                 )}
+                <div style={styles.categoriesSection}>
+    <div style={styles.sectionHeader}>
+        <h3 style={styles.sectionTitle}>Product Categories</h3>
+        {selectedCategory && (
+            <button 
+                onClick={() => setSelectedCategory(null)} 
+                style={styles.showAllButton}
+            >
+                Show All Products
+            </button>
+        )}
+    </div>
+    <div style={styles.categoryList}>
+        {categories.map((cat) => {
+            const categoryId = cat.category_id || cat.id;
+            const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
+            return (
+                <div 
+                    key={categoryId} 
+                    style={{
+                        ...styles.categoryCard,
+                        ...(selectedCategory === categoryId ? styles.categoryCardActive : {}),
+                        cursor: 'pointer'
+                    }}
+                    onClick={() => setSelectedCategory(categoryId)}
+                >
+                    <h4 style={selectedCategory === categoryId ? { color: 'white' } : {}}>
+                        {cat.category_name || cat.name}
+                    </h4>
+                    <p style={selectedCategory === categoryId ? { color: '#e0e0e0' } : {}}>
+                        {cat.description}
+                    </p>
+                    <small style={{
+                        ...styles.productCount,
+                        ...(selectedCategory === categoryId ? { color: '#e0e0e0' } : {})
+                    }}>
+                        {productCount} product(s)
+                    </small>
+                </div>
+            );
+        })}
+    </div>
+</div>
                 
                 {/* Products Tab */}
                 {activeTab === 'products' && (
@@ -331,21 +398,31 @@ function App() {
                             <table style={styles.table}>
                                 <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Category</th><th>Actions</th></tr></thead>
                                 <tbody>
-                                    {products.map((product) => (
-                                        <tr key={product.product_id || product.id}>
-                                            <td>{product.name}</td>
-                                            <td>${product.price}</td>
-                                            <td><span style={{...styles.stockBadge, backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'}}>{product.quantity_in_stock}</span></td>
-                                           <td>
-    {(() => {
-        const category = categories.find(c => (c.category_id || c.id) === (product.category_id || product.category));
-        return category ? (category.category_name || category.name) : 'Uncategorized';
-    })()}
-</td>
-                                            <td><button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
+    {(selectedCategory 
+        ? products.filter(p => (p.category_id || p.category) === selectedCategory)
+        : products
+    ).map((product) => (
+        <tr key={product.product_id || product.id}>
+            <td>{product.name}</td>
+            <td>${product.price}</td>
+            <td>
+                <span style={{
+                    ...styles.stockBadge, 
+                    backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : 
+                                   product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'
+                }}>
+                    {product.quantity_in_stock}
+                </span>
+            </td>
+            <td>{product.categories?.category_name || 'Uncategorized'}</td>
+            <td>
+                <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>
+                    Delete
+                </button>
+            </td>
+        </tr>
+    ))}
+</tbody>
                             </table>
                         </div>
                     </div>
@@ -546,6 +623,26 @@ const styles = {
     activeTab: {
         backgroundColor: '#007bff',
         color: 'white'
+    },
+        showAllButton: {
+        padding: '6px 12px',
+        backgroundColor: '#6c757d',
+        color: 'white',
+        border: 'none',
+        borderRadius: '4px',
+        cursor: 'pointer',
+        fontSize: '12px'
+    },
+    categoryCardActive: {
+        backgroundColor: '#007bff',
+        color: 'white',
+        border: '1px solid #007bff'
+    },
+    productCount: {
+        display: 'block',
+        marginTop: '8px',
+        fontSize: '11px',
+        color: '#666'
     },
     activeTab: { backgroundColor: '#007bff', color: 'white' },
     dashboard: { padding: '30px' },
