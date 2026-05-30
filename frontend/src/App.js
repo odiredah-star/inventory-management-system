@@ -28,7 +28,7 @@ function App() {
     const [newPurchase, setNewPurchase] = useState({ supplier_id: '', items: [{ product_id: '', quantity: '', cost_price: '' }] });
     const [newSale, setNewSale] = useState({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
 
-    const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
+    https://inventory-management-system-1-yji6.onrender.com
 
     // Login function
     const handleLogin = async (e) => {
@@ -516,7 +516,10 @@ const styles = {
     productsSection: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', marginBottom: '30px' },
     sectionHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' },
     addButton: { padding: '8px 16px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
-    productTable: { overflowX: 'auto' },
+     productTable: {
+        overflowX: 'auto',
+        WebkitOverflowScrolling: 'touch'
+    },
     table: { width: '100%', borderCollapse: 'collapse' },
     stockBadge: { padding: '4px 8px', borderRadius: '4px', color: 'white', fontWeight: 'bold', fontSize: '12px' },
     deleteButton: { padding: '4px 8px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
