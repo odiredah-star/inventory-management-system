@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 
 const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
 
-// FALLBACK CATEGORIES - Will show if backend fails
-const DEFAULT_CATEGORIES = [
+// HARDCODED CATEGORIES - These will ALWAYS show
+const HARDCODED_CATEGORIES = [
     { category_id: '1', category_name: 'Electronics', description: 'Electronic devices and accessories' },
     { category_id: '2', category_name: 'Clothing', description: 'Apparel and fashion items' },
     { category_id: '3', category_name: 'Furniture', description: 'Home and office furniture' }
@@ -19,7 +19,7 @@ function App() {
     const [message, setMessage] = useState('');
     
     // ========== DATA STATES ==========
-    const [categories, setCategories] = useState(DEFAULT_CATEGORIES); // Start with default categories
+    const [categories, setCategories] = useState(HARDCODED_CATEGORIES); // Start with hardcoded
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -93,20 +93,7 @@ function App() {
             const token = localStorage.getItem('token');
             const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
             
-            // Try to load categories from server, if fails, keep default
-            try {
-                const catRes = await fetch(`${API_URL}/api/v1/categories`, { headers });
-                const catData = await catRes.json();
-                if (catData.success && catData.data && catData.data.length > 0) {
-                    setCategories(catData.data);
-                } else {
-                    console.log('Using default categories');
-                    setCategories(DEFAULT_CATEGORIES);
-                }
-            } catch (err) {
-                console.log('Failed to load categories, using defaults', err);
-                setCategories(DEFAULT_CATEGORIES);
-            }
+            // Categories are already set to HARDCODED_CATEGORIES, so they will always show
             
             // Load products
             const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
@@ -140,8 +127,6 @@ function App() {
             
         } catch (error) {
             console.error('Error loading data:', error);
-            // Keep default categories if everything fails
-            setCategories(DEFAULT_CATEGORIES);
         }
     };
 
@@ -477,7 +462,7 @@ function App() {
                                     {categoryProducts.length === 0 ? (
                                         <tr>
                                             <td colSpan="5" style={styles.noData}>No products in this category yet. Add one!</td>
-                                         </tr>
+                                        </tr>
                                     ) : (
                                         categoryProducts.map((product) => (
                                             <tr key={product.product_id || product.id}>
@@ -578,31 +563,27 @@ function App() {
                             <div style={styles.statCard}><h3>Transactions</h3><p style={styles.statNumber}>{salesStats.saleCount || 0}</p></div>
                         </div>
                         
-                        {/* PRODUCT CATEGORIES SECTION - THIS IS WHAT YOU WANT */}
+                        {/* PRODUCT CATEGORIES SECTION - THESE WILL ALWAYS SHOW */}
                         <div style={styles.categoriesSection}>
                             <h3 style={styles.sectionTitle}>Product Categories</h3>
                             <div style={styles.categoryList}>
-                                {categories.length === 0 ? (
-                                    <p>Loading categories...</p>
-                                ) : (
-                                    categories.map((cat) => {
-                                        const categoryId = cat.category_id || cat.id;
-                                        const categoryName = cat.category_name || cat.name;
-                                        const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
-                                        return (
-                                            <div 
-                                                key={categoryId} 
-                                                style={styles.categoryCard}
-                                                onClick={() => setSelectedCategoryPage(categoryId)}
-                                            >
-                                                <h4>{categoryName}</h4>
-                                                <p>{cat.description}</p>
-                                                <small style={styles.productCount}>{productCount} product(s)</small>
-                                                <div style={styles.viewProductsButton}>View Products →</div>
-                                            </div>
-                                        );
-                                    })
-                                )}
+                                {categories.map((cat) => {
+                                    const categoryId = cat.category_id || cat.id;
+                                    const categoryName = cat.category_name || cat.name;
+                                    const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
+                                    return (
+                                        <div 
+                                            key={categoryId} 
+                                            style={styles.categoryCard}
+                                            onClick={() => setSelectedCategoryPage(categoryId)}
+                                        >
+                                            <h4>{categoryName}</h4>
+                                            <p>{cat.description || 'No description'}</p>
+                                            <small style={styles.productCount}>{productCount} product(s)</small>
+                                            <div style={styles.viewProductsButton}>View Products →</div>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
                         
