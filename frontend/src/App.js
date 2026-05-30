@@ -28,7 +28,14 @@ function App() {
     const [newPurchase, setNewPurchase] = useState({ supplier_id: '', items: [{ product_id: '', quantity: '', cost_price: '' }] });
     const [newSale, setNewSale] = useState({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
 
-    https://inventory-management-system-1-yji6.onrender.com
+       // Mobile detection
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+    
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth < 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Login function
     const handleLogin = async (e) => {
@@ -266,11 +273,26 @@ function App() {
                 </div>
             </nav>
             
-            <div style={styles.tabs}>
-                <button onClick={() => setActiveTab('dashboard')} style={{...styles.tab, ...(activeTab === 'dashboard' ? styles.activeTab : {})}}>Dashboard</button>
-                <button onClick={() => setActiveTab('products')} style={{...styles.tab, ...(activeTab === 'products' ? styles.activeTab : {})}}>Products</button>
-                <button onClick={() => setActiveTab('purchases')} style={{...styles.tab, ...(activeTab === 'purchases' ? styles.activeTab : {})}}>Purchases</button>
-                <button onClick={() => setActiveTab('sales')} style={{...styles.tab, ...(activeTab === 'sales' ? styles.activeTab : {})}}>Sales</button>
+                        <div style={styles.tabs}>
+                {isMobile ? (
+                    <select 
+                        value={activeTab} 
+                        onChange={(e) => setActiveTab(e.target.value)}
+                        style={styles.mobileSelect}
+                    >
+                        <option value="dashboard">Dashboard</option>
+                        <option value="products">Products</option>
+                        <option value="purchases">Purchases</option>
+                        <option value="sales">Sales</option>
+                    </select>
+                ) : (
+                    <>
+                        <button onClick={() => setActiveTab('dashboard')} style={{...styles.tab, ...(activeTab === 'dashboard' ? styles.activeTab : {})}}>Dashboard</button>
+                        <button onClick={() => setActiveTab('products')} style={{...styles.tab, ...(activeTab === 'products' ? styles.activeTab : {})}}>Products</button>
+                        <button onClick={() => setActiveTab('purchases')} style={{...styles.tab, ...(activeTab === 'purchases' ? styles.activeTab : {})}}>Purchases</button>
+                        <button onClick={() => setActiveTab('sales')} style={{...styles.tab, ...(activeTab === 'sales' ? styles.activeTab : {})}}>Sales</button>
+                    </>
+                )}
             </div>
             
             <div style={styles.dashboard}>
@@ -504,6 +526,27 @@ const styles = {
     logoutButton: { padding: '8px 16px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' },
     tabs: { display: 'flex', gap: '10px', padding: '20px 30px 0 30px', backgroundColor: '#f0f2f5' },
     tab: { padding: '10px 20px', backgroundColor: 'white', border: 'none', borderRadius: '8px 8px 0 0', cursor: 'pointer', fontSize: '16px' },
+        tab: {
+        padding: '10px 20px',
+        backgroundColor: 'white',
+        border: 'none',
+        borderRadius: '8px 8px 0 0',
+        cursor: 'pointer',
+        fontSize: '16px'
+    },
+    mobileSelect: {
+        width: '100%',
+        padding: '12px',
+        fontSize: '16px',
+        borderRadius: '8px',
+        border: '1px solid #ddd',
+        backgroundColor: 'white',
+        marginBottom: '10px'
+    },
+    activeTab: {
+        backgroundColor: '#007bff',
+        color: 'white'
+    },
     activeTab: { backgroundColor: '#007bff', color: 'white' },
     dashboard: { padding: '30px' },
     statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' },
