@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 // Change this to your backend URL
 // For local testing: http://localhost:5000
 // For production: https://inventory-management-system-1-yji6.onrender.com
-const API_URL = 'http://localhost:5000';
+const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
 
 function App() {
     // ========== AUTHENTICATION STATES ==========
