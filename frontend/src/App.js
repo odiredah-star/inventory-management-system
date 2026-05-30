@@ -26,6 +26,8 @@ function App() {
     const [showPurchaseForm, setShowPurchaseForm] = useState(false);
     const [showSaleForm, setShowSaleForm] = useState(false);
     const [selectedCategoryPage, setSelectedCategoryPage] = useState(null);
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportType, setReportType] = useState('inventory');
     
     // ========== EDIT PRODUCT STATES ==========
     const [editingProduct, setEditingProduct] = useState(null);
@@ -111,6 +113,75 @@ function App() {
             
         } catch (error) {
             console.error('Error loading data:', error);
+        }
+    };
+
+    // ========== REPORT FUNCTIONS ==========
+    const generatePDF = async () => {
+        try {
+            const { jsPDF } = await import('jspdf');
+            const autoTable = (await import('jspdf-autotable')).default;
+            const doc = new jsPDF();
+            
+            if (reportType === 'inventory') {
+                doc.setFontSize(18);
+                doc.text('Inventory Report', 14, 15);
+                doc.setFontSize(10);
+                doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+                doc.text(`Total Products: ${products.length}`, 14, 35);
+                
+                const tableData = products.map(p => [
+                    p.name,
+                    `$${p.price}`,
+                    p.quantity_in_stock,
+                    p.categories?.category_name || 'Uncategorized'
+                ]);
+                
+                autoTable(doc, {
+                    startY: 45,
+                    head: [['Product Name', 'Price', 'Stock', 'Category']],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [0, 123, 255], textColor: 255 },
+                    styles: { fontSize: 9, cellPadding: 3 },
+                });
+                
+                doc.save('inventory-report.pdf');
+            } else if (reportType === 'sales') {
+                doc.setFontSize(18);
+                doc.text('Sales Report', 14, 15);
+                doc.setFontSize(10);
+                doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 25);
+                doc.text(`Total Sales: $${salesStats.totalSales?.toLocaleString() || 0}`, 14, 35);
+                doc.text(`Today's Sales: $${salesStats.todaySales?.toLocaleString() || 0}`, 14, 45);
+                doc.text(`Total Transactions: ${salesStats.saleCount || 0}`, 14, 55);
+                
+                const tableData = sales.map(s => [
+                    s.sale_number,
+                    new Date(s.sale_date).toLocaleDateString(),
+                    s.customer?.customer_name || 'Walk-in',
+                    `$${s.total_amount?.toFixed(2)}`,
+                    s.payment_method,
+                    `${s.items_count} items`
+                ]);
+                
+                autoTable(doc, {
+                    startY: 65,
+                    head: [['Invoice #', 'Date', 'Customer', 'Total', 'Payment', 'Items']],
+                    body: tableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [0, 123, 255], textColor: 255 },
+                    styles: { fontSize: 8, cellPadding: 2 },
+                });
+                
+                doc.save('sales-report.pdf');
+            }
+            
+            setShowReportModal(false);
+            setMessage('Report downloaded successfully!');
+        } catch (error) {
+            console.error('PDF generation error:', error);
+            setMessage('Error generating PDF. Please try again.');
         }
     };
 
@@ -451,6 +522,12 @@ function App() {
             <div style={styles.dashboard}>
                 {activeTab === 'dashboard' && (
                     <>
+                        <div style={styles.reportButtonContainer}>
+                            <button onClick={() => setShowReportModal(true)} style={styles.reportButton}>
+                                📊 Generate Report
+                            </button>
+                        </div>
+                        
                         <div style={styles.statsGrid}>
                             <div style={styles.statCard}><h3>Total Products</h3><p style={styles.statNumber}>{products.length}</p></div>
                             <div style={styles.statCard}><h3>Total Sales</h3><p style={styles.statNumber}>${salesStats.totalSales?.toLocaleString() || 0}</p></div>
@@ -541,13 +618,13 @@ function App() {
                                                 }}>
                                                     {product.quantity_in_stock}
                                                 </span>
-                                             </td>
-                                            <td>{product.categories?.category_name || 'Uncategorized'} </td>
+                                            </td>
+                                            <td>{product.categories?.category_name || 'Uncategorized'}</td>
                                             <td>
                                                 <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
                                                 <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
-                                             </td>
-                                         </tr>
+                                            </td>
+                                        </tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -575,12 +652,12 @@ function App() {
                                 <tbody>
                                     {purchases.map((purchase) => (
                                         <tr key={purchase.purchase_id}>
-                                            <td>{purchase.purchase_number} </td>
-                                            <td>{purchase.suppliers?.supplier_name || 'Unknown'} </td>
-                                            <td>{new Date(purchase.purchase_date).toLocaleDateString()} </td>
-                                            <td>${purchase.total_cost?.toFixed(2)} </td>
+                                            <td>{purchase.purchase_number}</td>
+                                            <td>{purchase.suppliers?.supplier_name || 'Unknown'}</td>
+                                            <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
+                                            <td>${purchase.total_cost?.toFixed(2)}</td>
                                             <td>{purchase.items_count} items</td>
-                                         </tr>
+                                        </tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -615,7 +692,7 @@ function App() {
                                             <td>${sale.total_amount?.toFixed(2)}</td>
                                             <td>{sale.payment_method}</td>
                                             <td>{sale.items_count} items</td>
-                                         </tr>
+                                        </tr>
                                     ))}
                                 </tbody>
                             </table>
@@ -761,6 +838,38 @@ function App() {
                     </div>
                 </div>
             )}
+            
+            {/* Report Modal */}
+            {showReportModal && (
+                <div style={styles.modalOverlay}>
+                    <div style={styles.modal}>
+                        <div style={styles.modalHeader}>
+                            <h3>Generate Report</h3>
+                            <button onClick={() => setShowReportModal(false)} style={styles.closeButton}>×</button>
+                        </div>
+                        <div style={styles.reportOptions}>
+                            <button 
+                                onClick={() => {
+                                    setReportType('inventory');
+                                    generatePDF();
+                                }} 
+                                style={styles.reportOptionButton}
+                            >
+                                📦 Inventory Report
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setReportType('sales');
+                                    generatePDF();
+                                }} 
+                                style={styles.reportOptionButton}
+                            >
+                                💰 Sales Report
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -790,6 +899,10 @@ const styles = {
     mobileSelect: { width: '100%', padding: '12px', fontSize: '16px', borderRadius: '8px', border: '1px solid #ddd', backgroundColor: 'white', marginBottom: '10px' },
     activeTab: { backgroundColor: '#007bff', color: 'white' },
     dashboard: { padding: '15px' },
+    reportButtonContainer: { display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' },
+    reportButton: { padding: '10px 20px', backgroundColor: '#17a2b8', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '14px' },
+    reportOptions: { display: 'flex', gap: '15px', justifyContent: 'center', padding: '20px', flexWrap: 'wrap' },
+    reportOptionButton: { padding: '15px 30px', backgroundColor: '#007bff', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '16px', transition: 'all 0.3s ease' },
     statsGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px', marginBottom: '30px' },
     statCard: { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', textAlign: 'center' },
     statNumber: { fontSize: '32px', fontWeight: 'bold', color: '#007bff', margin: '10px 0 0 0' },
