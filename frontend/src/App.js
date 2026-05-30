@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 
+// Change this to your backend URL
+// For local testing: http://localhost:5000
+// For production: https://inventory-management-system-1-yji6.onrender.com
 const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
-
-// HARDCODED CATEGORIES - These will ALWAYS show
-const HARDCODED_CATEGORIES = [
-    { id: '1', name: 'Electronics', description: 'Electronic devices and accessories' },
-    { id: '2', name: 'Clothing', description: 'Apparel and fashion items' },
-    { id: '3', name: 'Furniture', description: 'Home and office furniture' }
-];
 
 function App() {
     // ========== AUTHENTICATION STATES ==========
@@ -19,7 +15,7 @@ function App() {
     const [message, setMessage] = useState('');
     
     // ========== DATA STATES ==========
-    const [categories, setCategories] = useState(HARDCODED_CATEGORIES);
+    const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -80,6 +76,7 @@ function App() {
                 setIsLoggedIn(true);
                 setUser(data.data.user);
                 localStorage.setItem('token', data.data.accessToken);
+                localStorage.setItem('user', JSON.stringify(data.data.user));
                 setMessage(`Welcome ${data.data.user.full_name}!`);
                 await loadAllData();
             } else {
@@ -96,10 +93,22 @@ function App() {
             const token = localStorage.getItem('token');
             const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
             
-            // Load products
+            // Load categories
+            const catRes = await fetch(`${API_URL}/api/v1/categories`, { headers });
+            const catData = await catRes.json();
+            if (catData.success && catData.data) {
+                setCategories(catData.data);
+            }
+            
+            // Load products - THIS IS WHERE PRODUCTS COME FROM
             const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
             const prodData = await prodRes.json();
-            if (prodData.success) setProducts(prodData.data || []);
+            if (prodData.success && prodData.data) {
+                console.log('Products loaded:', prodData.data.length);
+                setProducts(prodData.data);
+            } else {
+                console.log('No products or error:', prodData);
+            }
             
             // Load suppliers
             const supRes = await fetch(`${API_URL}/api/v1/suppliers`, { headers });
@@ -127,7 +136,8 @@ function App() {
             if (statsData.success) setSalesStats(statsData.data);
             
             // Load users (admin only)
-            if (user?.role === 'admin') {
+            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+            if (storedUser?.role === 'admin') {
                 const usersRes = await fetch(`${API_URL}/api/v1/users`, { headers });
                 const usersData = await usersRes.json();
                 if (usersData.success) setUsers(usersData.data);
@@ -193,7 +203,7 @@ function App() {
                 p.name,
                 p.price,
                 p.quantity_in_stock,
-                p.categories?.category_name || 'Uncategorized'
+                p.categories?.category_name || p.category_name || 'Uncategorized'
             ]);
             filename = 'inventory-report.csv';
         } else if (type === 'sales') {
@@ -246,7 +256,7 @@ function App() {
                     p.name,
                     `$${p.price}`,
                     p.quantity_in_stock,
-                    p.categories?.category_name || 'Uncategorized'
+                    p.categories?.category_name || p.category_name || 'Uncategorized'
                 ]);
                 
                 autoTable(doc, {
@@ -319,7 +329,7 @@ function App() {
                 loadAllData();
                 setMessage('Product added!');
             } else {
-                setMessage('Failed to add product');
+                setMessage('Failed to add product: ' + data.error);
             }
         } catch (error) {
             setMessage('Error: ' + error.message);
@@ -347,7 +357,7 @@ function App() {
             name: product.name,
             price: product.price,
             quantity_in_stock: product.quantity_in_stock,
-            category_id: product.category_id || product.category
+            category_id: product.category_id
         });
     };
 
@@ -355,7 +365,7 @@ function App() {
         e.preventDefault();
         const token = localStorage.getItem('token');
         try {
-            const productId = editingProduct.product_id || editingProduct.id;
+            const productId = editingProduct.id || editingProduct.product_id;
             const response = await fetch(`${API_URL}/api/v1/products/${productId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
@@ -479,14 +489,17 @@ function App() {
     // Get filtered products for selected category
     const getFilteredProducts = () => {
         if (!selectedCategoryPage) return [];
-        return products.filter(p => (p.category_id || p.category) === selectedCategoryPage);
+        return products.filter(p => (p.category_id) === selectedCategoryPage);
     };
 
     // Get category name by ID
     const getCategoryName = (categoryId) => {
-        const category = categories.find(c => (c.id || c.category_id) === categoryId);
-        return category ? (category.name || category.category_name) : 'Category';
+        const category = categories.find(c => c.id === categoryId);
+        return category ? category.name : 'Category';
     };
+
+    // Get current user role
+    const currentUserRole = user?.role || JSON.parse(localStorage.getItem('user') || '{}')?.role;
 
     // ========== LOGIN SCREEN ==========
     if (!isLoggedIn) {
@@ -523,8 +536,8 @@ function App() {
                 <nav style={styles.navbar}>
                     <h2 style={styles.navTitle}>Inventory System</h2>
                     <div style={styles.navRight}>
-                        <span style={styles.userRole}>{user?.role?.toUpperCase()}</span>
-                        <span style={styles.userName}>Welcome, {user?.full_name}!</span>
+                        <span style={styles.userRole}>{currentUserRole?.toUpperCase()}</span>
+                        <span style={styles.userName}>Welcome, {user?.full_name || 'User'}!</span>
                         <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
                     </div>
                 </nav>
@@ -541,7 +554,7 @@ function App() {
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
                             <h3 style={styles.sectionTitle}>Products in {categoryName}</h3>
-                            {user?.role === 'admin' && (
+                            {currentUserRole === 'admin' && (
                                 <button onClick={() => setShowProductForm(true)} style={styles.addButton}>+ Add Product</button>
                             )}
                         </div>
@@ -563,7 +576,7 @@ function App() {
                                         </tr>
                                     ) : (
                                         categoryProducts.map((product) => (
-                                            <tr key={product.product_id || product.id}>
+                                            <tr key={product.id}>
                                                 <td>{product.name}</td>
                                                 <td>${product.price}</td>
                                                 <td>
@@ -577,10 +590,10 @@ function App() {
                                                 </td>
                                                 <td>{categoryName}</td>
                                                 <td>
-                                                    {user?.role === 'admin' && (
+                                                    {currentUserRole === 'admin' && (
                                                         <>
                                                             <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
-                                                            <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                                            <button onClick={() => handleDeleteProduct(product.id)} style={styles.deleteButton}>Delete</button>
                                                         </>
                                                     )}
                                                 </td>
@@ -588,7 +601,7 @@ function App() {
                                         ))
                                     )}
                                 </tbody>
-                            </tr>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -604,6 +617,7 @@ function App() {
                                 <input type="text" placeholder="Product Name" value={newProduct.name} onChange={(e) => setNewProduct({...newProduct, name: e.target.value})} style={styles.modalInput} required />
                                 <input type="number" placeholder="Price" value={newProduct.price} onChange={(e) => setNewProduct({...newProduct, price: e.target.value})} style={styles.modalInput} required />
                                 <input type="number" placeholder="Initial Stock" value={newProduct.quantity_in_stock} onChange={(e) => setNewProduct({...newProduct, quantity_in_stock: e.target.value})} style={styles.modalInput} required />
+                                <input type="hidden" value={selectedCategoryPage} />
                                 <button type="submit" style={styles.submitButton}>Add Product</button>
                             </form>
                         </div>
@@ -619,8 +633,8 @@ function App() {
             <nav style={styles.navbar}>
                 <h2 style={styles.navTitle}>Inventory System</h2>
                 <div style={styles.navRight}>
-                    <span style={styles.userRole}>{user?.role?.toUpperCase()}</span>
-                    <span style={styles.userName}>Welcome, {user?.full_name}!</span>
+                    <span style={styles.userRole}>{currentUserRole?.toUpperCase()}</span>
+                    <span style={styles.userName}>Welcome, {user?.full_name || 'User'}!</span>
                     <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
                 </div>
             </nav>
@@ -632,7 +646,7 @@ function App() {
                         <option value="products">Products</option>
                         <option value="purchases">Purchases</option>
                         <option value="sales">Sales</option>
-                        {user?.role === 'admin' && <option value="users">Users</option>}
+                        {currentUserRole === 'admin' && <option value="users">Users</option>}
                     </select>
                 ) : (
                     <>
@@ -640,7 +654,7 @@ function App() {
                         <button onClick={() => setActiveTab('products')} style={{...styles.tab, ...(activeTab === 'products' ? styles.activeTab : {})}}>Products</button>
                         <button onClick={() => setActiveTab('purchases')} style={{...styles.tab, ...(activeTab === 'purchases' ? styles.activeTab : {})}}>Purchases</button>
                         <button onClick={() => setActiveTab('sales')} style={{...styles.tab, ...(activeTab === 'sales' ? styles.activeTab : {})}}>Sales</button>
-                        {user?.role === 'admin' && (
+                        {currentUserRole === 'admin' && (
                             <button onClick={() => setActiveTab('users')} style={{...styles.tab, ...(activeTab === 'users' ? styles.activeTab : {})}}>Users</button>
                         )}
                     </>
@@ -650,7 +664,7 @@ function App() {
             <div style={styles.dashboard}>
                 {activeTab === 'dashboard' && (
                     <>
-                        {user?.role === 'admin' && (
+                        {currentUserRole === 'admin' && (
                             <div style={styles.reportButtonContainer}>
                                 <button onClick={() => setShowReportModal(true)} style={styles.reportButton}>
                                     📊 Generate Report
@@ -669,17 +683,15 @@ function App() {
                             <h3 style={styles.sectionTitle}>Product Categories</h3>
                             <div style={styles.categoryList}>
                                 {categories.map((cat) => {
-                                    const categoryId = cat.id || cat.category_id;
-                                    const categoryName = cat.name || cat.category_name;
-                                    const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
+                                    const productCount = products.filter(p => p.category_id === cat.id).length;
                                     return (
                                         <div 
-                                            key={categoryId} 
+                                            key={cat.id} 
                                             style={styles.categoryCard}
-                                            onClick={() => setSelectedCategoryPage(categoryId)}
+                                            onClick={() => setSelectedCategoryPage(cat.id)}
                                         >
-                                            <h4>{categoryName}</h4>
-                                            <p>{cat.description || 'No description'}</p>
+                                            <h4>{cat.name}</h4>
+                                            <p>{cat.description}</p>
                                             <small style={styles.productCount}>{productCount} product(s)</small>
                                             <div style={styles.viewProductsButton}>View Products →</div>
                                         </div>
@@ -703,13 +715,13 @@ function App() {
                                     </thead>
                                     <tbody>
                                         {sales.slice(0, 5).map((sale) => (
-                                            <tr key={sale.sale_id}>
+                                            <tr key={sale.id}>
                                                 <td>{sale.sale_number}</td>
                                                 <td>{new Date(sale.sale_date).toLocaleDateString()}</td>
                                                 <td>{sale.customer?.customer_name || 'Walk-in'}</td>
                                                 <td>${sale.total_amount?.toFixed(2)}</td>
-                                                <td>{sale.items_count} items</td>
-                                            </tr>
+                                                <td>{sale.items_count} items\n
+                                            </td>
                                         ))}
                                     </tbody>
                                 </table>
@@ -722,7 +734,7 @@ function App() {
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
                             <h3 style={styles.sectionTitle}>All Products</h3>
-                            {user?.role === 'admin' && (
+                            {currentUserRole === 'admin' && (
                                 <button onClick={() => setShowProductForm(true)} style={styles.addButton}>+ Add Product</button>
                             )}
                         </div>
@@ -738,30 +750,33 @@ function App() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {products.map((product) => (
-                                        <tr key={product.product_id || product.id}>
-                                            <td>{product.name}</td>
-                                            <td>${product.price}</td>
-                                            <td>
-                                                <span style={{
-                                                    ...styles.stockBadge,
-                                                    backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : 
-                                                                   product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'
-                                                }}>
-                                                    {product.quantity_in_stock}
-                                                </span>
-                                            </td>
-                                            <td>{product.categories?.category_name || 'Uncategorized'}</td>
-                                            <td>
-                                                {user?.role === 'admin' && (
-                                                    <>
-                                                        <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
-                                                        <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
-                                                    </>
-                                                )}
-                                            </td>
-                                        </td>
-                                    ))}
+                                    {products.map((product) => {
+                                        const categoryName = categories.find(c => c.id === product.category_id)?.name || 'Uncategorized';
+                                        return (
+                                            <tr key={product.id}>
+                                                <td>{product.name}</td>
+                                                <td>${product.price}</td>
+                                                <td>
+                                                    <span style={{
+                                                        ...styles.stockBadge,
+                                                        backgroundColor: product.quantity_in_stock === 0 ? '#dc3545' : 
+                                                                       product.quantity_in_stock < 10 ? '#ffc107' : '#28a745'
+                                                    }}>
+                                                        {product.quantity_in_stock}
+                                                    </span>
+                                                </td>
+                                                <td>{categoryName}</td>
+                                                <td>
+                                                    {currentUserRole === 'admin' && (
+                                                        <>
+                                                            <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
+                                                            <button onClick={() => handleDeleteProduct(product.id)} style={styles.deleteButton}>Delete</button>
+                                                        </>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -787,12 +802,12 @@ function App() {
                                 </thead>
                                 <tbody>
                                     {purchases.map((purchase) => (
-                                        <tr key={purchase.purchase_id}>
+                                        <tr key={purchase.id}>
                                             <td>{purchase.purchase_number}</td>
                                             <td>{purchase.suppliers?.supplier_name || 'Unknown'}</td>
                                             <td>{new Date(purchase.purchase_date).toLocaleDateString()}</td>
                                             <td>${purchase.total_cost?.toFixed(2)}</td>
-                                            <td>{purchase.items_count} items</td>
+                                            <td>{purchase.items_count} items\n
                                         </tr>
                                     ))}
                                 </tbody>
@@ -821,13 +836,13 @@ function App() {
                                 </thead>
                                 <tbody>
                                     {sales.map((sale) => (
-                                        <tr key={sale.sale_id}>
+                                        <tr key={sale.id}>
                                             <td>{sale.sale_number}</td>
                                             <td>{new Date(sale.sale_date).toLocaleDateString()}</td>
                                             <td>{sale.customer?.customer_name || 'Walk-in'}</td>
                                             <td>${sale.total_amount?.toFixed(2)}</td>
                                             <td>{sale.payment_method}</td>
-                                            <td>{sale.items_count} items</td>
+                                            <td>{sale.items_count} items\n
                                         </tr>
                                     ))}
                                 </tbody>
@@ -836,7 +851,7 @@ function App() {
                     </div>
                 )}
                 
-                {activeTab === 'users' && user?.role === 'admin' && (
+                {activeTab === 'users' && currentUserRole === 'admin' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
                             <h3 style={styles.sectionTitle}>User Management</h3>
@@ -891,7 +906,7 @@ function App() {
             </div>
             
             {/* Add Product Modal */}
-            {showProductForm && !selectedCategoryPage && user?.role === 'admin' && (
+            {showProductForm && !selectedCategoryPage && currentUserRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
                         <div style={styles.modalHeader}>
@@ -905,9 +920,7 @@ function App() {
                             <select value={newProduct.category_id} onChange={(e) => setNewProduct({...newProduct, category_id: e.target.value})} style={styles.modalInput} required>
                                 <option value="">Select Category</option>
                                 {categories.map((cat) => (
-                                    <option key={cat.id || cat.category_id} value={cat.id || cat.category_id}>
-                                        {cat.name || cat.category_name}
-                                    </option>
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                                 ))}
                             </select>
                             <button type="submit" style={styles.submitButton}>Add Product</button>
@@ -917,7 +930,7 @@ function App() {
             )}
             
             {/* Edit Product Modal */}
-            {editingProduct && user?.role === 'admin' && (
+            {editingProduct && currentUserRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
                         <div style={styles.modalHeader}>
@@ -931,9 +944,7 @@ function App() {
                             <select value={editProductData.category_id} onChange={(e) => setEditProductData({...editProductData, category_id: e.target.value})} style={styles.modalInput} required>
                                 <option value="">Select Category</option>
                                 {categories.map((cat) => (
-                                    <option key={cat.id || cat.category_id} value={cat.id || cat.category_id}>
-                                        {cat.name || cat.category_name}
-                                    </option>
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
                                 ))}
                             </select>
                             <button type="submit" style={styles.submitButton}>Update Product</button>
@@ -943,7 +954,7 @@ function App() {
             )}
             
             {/* User Form Modal */}
-            {showUserForm && user?.role === 'admin' && (
+            {showUserForm && currentUserRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
                         <div style={styles.modalHeader}>
@@ -976,9 +987,7 @@ function App() {
                             <select value={newPurchase.supplier_id} onChange={(e) => setNewPurchase({...newPurchase, supplier_id: e.target.value})} style={styles.modalInput} required>
                                 <option value="">Select Supplier</option>
                                 {suppliers.map((sup) => (
-                                    <option key={sup.supplier_id || sup.id} value={sup.supplier_id || sup.id}>
-                                        {sup.supplier_name || sup.name}
-                                    </option>
+                                    <option key={sup.id} value={sup.id}>{sup.supplier_name}</option>
                                 ))}
                             </select>
                             <h4>Items:</h4>
@@ -987,7 +996,7 @@ function App() {
                                     <select value={item.product_id} onChange={(e) => handlePurchaseItemChange(idx, 'product_id', e.target.value)} style={styles.itemSelect} required>
                                         <option value="">Select Product</option>
                                         {products.map((p) => (
-                                            <option key={p.product_id || p.id} value={p.product_id || p.id}>{p.name}</option>
+                                            <option key={p.id} value={p.id}>{p.name} (Stock: {p.quantity_in_stock})</option>
                                         ))}
                                     </select>
                                     <input type="number" placeholder="Qty" value={item.quantity} onChange={(e) => handlePurchaseItemChange(idx, 'quantity', e.target.value)} style={styles.itemInput} required />
@@ -1016,9 +1025,7 @@ function App() {
                             <select value={newSale.customer_id} onChange={(e) => setNewSale({...newSale, customer_id: e.target.value})} style={styles.modalInput}>
                                 <option value="">Walk-in Customer</option>
                                 {customers.map((c) => (
-                                    <option key={c.customer_id || c.id} value={c.customer_id || c.id}>
-                                        {c.customer_name || c.name}
-                                    </option>
+                                    <option key={c.id} value={c.id}>{c.customer_name}</option>
                                 ))}
                             </select>
                             <select value={newSale.payment_method} onChange={(e) => setNewSale({...newSale, payment_method: e.target.value})} style={styles.modalInput}>
@@ -1032,7 +1039,7 @@ function App() {
                                     <select value={item.product_id} onChange={(e) => handleSaleItemChange(idx, 'product_id', e.target.value)} style={styles.itemSelect} required>
                                         <option value="">Select Product</option>
                                         {products.map((p) => (
-                                            <option key={p.product_id || p.id} value={p.product_id || p.id}>
+                                            <option key={p.id} value={p.id}>
                                                 {p.name} (${p.price}) - Stock: {p.quantity_in_stock}
                                             </option>
                                         ))}
@@ -1051,7 +1058,7 @@ function App() {
             )}
             
             {/* Report Modal */}
-            {showReportModal && user?.role === 'admin' && (
+            {showReportModal && currentUserRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
                         <div style={styles.modalHeader}>
