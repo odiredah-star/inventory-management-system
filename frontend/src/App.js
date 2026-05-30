@@ -2,6 +2,13 @@ import React, { useState, useEffect } from 'react';
 
 const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
 
+// FALLBACK CATEGORIES - Will show if backend fails
+const DEFAULT_CATEGORIES = [
+    { category_id: '1', category_name: 'Electronics', description: 'Electronic devices and accessories' },
+    { category_id: '2', category_name: 'Clothing', description: 'Apparel and fashion items' },
+    { category_id: '3', category_name: 'Furniture', description: 'Home and office furniture' }
+];
+
 function App() {
     // ========== AUTHENTICATION STATES ==========
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -12,7 +19,7 @@ function App() {
     const [message, setMessage] = useState('');
     
     // ========== DATA STATES ==========
-    const [categories, setCategories] = useState([]);
+    const [categories, setCategories] = useState(DEFAULT_CATEGORIES); // Start with default categories
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -71,7 +78,7 @@ function App() {
                 setUser(data.data.user);
                 localStorage.setItem('token', data.data.accessToken);
                 setMessage(`Welcome ${data.data.user.full_name}!`);
-                loadAllData();
+                await loadAllData();
             } else {
                 setMessage('Login failed: ' + data.error);
             }
@@ -82,46 +89,63 @@ function App() {
 
     // ========== LOAD ALL DATA ==========
     const loadAllData = async () => {
-    try {
-        const token = localStorage.getItem('token');
-        
-        const headers = { 'Authorization': `Bearer ${token}` };
-        
-        const catRes = await fetch(`${API_URL}/api/v1/categories`, { headers });
-        const catData = await catRes.json();
-        if (catData.success) setCategories(catData.data || []);
-        
-        const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
-        const prodData = await prodRes.json();
-        if (prodData.success) setProducts(prodData.data || []);
-        
-        const supRes = await fetch(`${API_URL}/api/v1/suppliers`, { headers });
-        const supData = await supRes.json();
-        if (supData.success) setSuppliers(supData.data || []);
-        
-        const custRes = await fetch(`${API_URL}/api/v1/customers`, { headers });
-        const custData = await custRes.json();
-        if (custData.success) setCustomers(custData.data || []);
-        
-        const purRes = await fetch(`${API_URL}/api/v1/purchases`, { headers });
-        const purData = await purRes.json();
-        if (purData.success) setPurchases(purData.data || []);
-        
-        const saleRes = await fetch(`${API_URL}/api/v1/sales`, { headers });
-        const saleData = await saleRes.json();
-        if (saleData.success) setSales(saleData.data || []);
-        
-        const statsRes = await fetch(`${API_URL}/api/v1/sales/stats`, { headers });
-        const statsData = await statsRes.json();
-        if (statsData.success) setSalesStats(statsData.data);
-        
-    } catch (error) {
-        console.error('Error loading data:', error);
-    }
-};
+        try {
+            const token = localStorage.getItem('token');
+            const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+            
+            // Try to load categories from server, if fails, keep default
+            try {
+                const catRes = await fetch(`${API_URL}/api/v1/categories`, { headers });
+                const catData = await catRes.json();
+                if (catData.success && catData.data && catData.data.length > 0) {
+                    setCategories(catData.data);
+                } else {
+                    console.log('Using default categories');
+                    setCategories(DEFAULT_CATEGORIES);
+                }
+            } catch (err) {
+                console.log('Failed to load categories, using defaults', err);
+                setCategories(DEFAULT_CATEGORIES);
+            }
+            
+            // Load products
+            const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
+            const prodData = await prodRes.json();
+            if (prodData.success) setProducts(prodData.data || []);
+            
+            // Load suppliers
+            const supRes = await fetch(`${API_URL}/api/v1/suppliers`, { headers });
+            const supData = await supRes.json();
+            if (supData.success) setSuppliers(supData.data || []);
+            
+            // Load customers
+            const custRes = await fetch(`${API_URL}/api/v1/customers`, { headers });
+            const custData = await custRes.json();
+            if (custData.success) setCustomers(custData.data || []);
+            
+            // Load purchases
+            const purRes = await fetch(`${API_URL}/api/v1/purchases`, { headers });
+            const purData = await purRes.json();
+            if (purData.success) setPurchases(purData.data || []);
+            
+            // Load sales
+            const saleRes = await fetch(`${API_URL}/api/v1/sales`, { headers });
+            const saleData = await saleRes.json();
+            if (saleData.success) setSales(saleData.data || []);
+            
+            // Load sales stats
+            const statsRes = await fetch(`${API_URL}/api/v1/sales/stats`, { headers });
+            const statsData = await statsRes.json();
+            if (statsData.success) setSalesStats(statsData.data);
+            
+        } catch (error) {
+            console.error('Error loading data:', error);
+            // Keep default categories if everything fails
+            setCategories(DEFAULT_CATEGORIES);
+        }
     };
 
-    // ========== REPORT FUNCTIONS (ADMIN ONLY) ==========
+    // ========== REPORT FUNCTIONS ==========
     const generatePDF = async () => {
         try {
             const { jsPDF } = await import('jspdf');
@@ -193,10 +217,11 @@ function App() {
     // ========== PRODUCT FUNCTIONS ==========
     const handleAddProduct = async (e) => {
         e.preventDefault();
+        const token = localStorage.getItem('token');
         try {
             const response = await fetch(`${API_URL}/api/v1/products`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     name: newProduct.name,
                     price: parseFloat(newProduct.price),
@@ -220,8 +245,12 @@ function App() {
 
     const handleDeleteProduct = async (productId) => {
         if (!window.confirm('Delete this product?')) return;
+        const token = localStorage.getItem('token');
         try {
-            await fetch(`${API_URL}/api/v1/products/${productId}`, { method: 'DELETE' });
+            await fetch(`${API_URL}/api/v1/products/${productId}`, { 
+                method: 'DELETE',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             loadAllData();
             setMessage('Product deleted');
         } catch (error) {
@@ -229,7 +258,6 @@ function App() {
         }
     };
 
-    // ========== EDIT PRODUCT FUNCTIONS ==========
     const handleEditProduct = (product) => {
         setEditingProduct(product);
         setEditProductData({
@@ -242,11 +270,12 @@ function App() {
 
     const handleUpdateProduct = async (e) => {
         e.preventDefault();
+        const token = localStorage.getItem('token');
         try {
             const productId = editingProduct.product_id || editingProduct.id;
             const response = await fetch(`${API_URL}/api/v1/products/${productId}`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({
                     name: editProductData.name,
                     price: parseFloat(editProductData.price),
@@ -271,10 +300,11 @@ function App() {
     // ========== PURCHASE FUNCTIONS ==========
     const handleAddPurchase = async (e) => {
         e.preventDefault();
+        const token = localStorage.getItem('token');
         try {
             const response = await fetch(`${API_URL}/api/v1/purchases`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(newPurchase)
             });
             const data = await response.json();
@@ -313,10 +343,11 @@ function App() {
     // ========== SALE FUNCTIONS ==========
     const handleAddSale = async (e) => {
         e.preventDefault();
+        const token = localStorage.getItem('token');
         try {
             const response = await fetch(`${API_URL}/api/v1/sales`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify(newSale)
             });
             const data = await response.json();
@@ -427,7 +458,9 @@ function App() {
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
                             <h3 style={styles.sectionTitle}>Products in {categoryName}</h3>
-                            <button onClick={() => setShowProductForm(true)} style={styles.addButton}>+ Add Product</button>
+                            {user?.role === 'admin' && (
+                                <button onClick={() => setShowProductForm(true)} style={styles.addButton}>+ Add Product</button>
+                            )}
                         </div>
                         <div style={styles.productTable}>
                             <table style={styles.table}>
@@ -444,7 +477,7 @@ function App() {
                                     {categoryProducts.length === 0 ? (
                                         <tr>
                                             <td colSpan="5" style={styles.noData}>No products in this category yet. Add one!</td>
-                                        </tr>
+                                         </tr>
                                     ) : (
                                         categoryProducts.map((product) => (
                                             <tr key={product.product_id || product.id}>
@@ -462,10 +495,10 @@ function App() {
                                                 <td>{categoryName}</td>
                                                 <td>
                                                     {user?.role === 'admin' && (
-                                                        <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
-                                                    )}
-                                                    {user?.role === 'admin' && (
-                                                        <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                                        <>
+                                                            <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
+                                                            <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                                        </>
                                                     )}
                                                 </td>
                                             </tr>
@@ -477,7 +510,6 @@ function App() {
                     </div>
                 </div>
                 
-                {/* Add Product Modal in Category Page */}
                 {showProductForm && (
                     <div style={styles.modalOverlay}>
                         <div style={styles.modal}>
@@ -531,7 +563,6 @@ function App() {
             <div style={styles.dashboard}>
                 {activeTab === 'dashboard' && (
                     <>
-                        {/* Report Button - ADMIN ONLY */}
                         {user?.role === 'admin' && (
                             <div style={styles.reportButtonContainer}>
                                 <button onClick={() => setShowReportModal(true)} style={styles.reportButton}>
@@ -547,26 +578,31 @@ function App() {
                             <div style={styles.statCard}><h3>Transactions</h3><p style={styles.statNumber}>{salesStats.saleCount || 0}</p></div>
                         </div>
                         
+                        {/* PRODUCT CATEGORIES SECTION - THIS IS WHAT YOU WANT */}
                         <div style={styles.categoriesSection}>
                             <h3 style={styles.sectionTitle}>Product Categories</h3>
                             <div style={styles.categoryList}>
-                                {categories.map((cat) => {
-                                    const categoryId = cat.category_id || cat.id;
-                                    const categoryName = cat.category_name || cat.name;
-                                    const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
-                                    return (
-                                        <div 
-                                            key={categoryId} 
-                                            style={styles.categoryCard}
-                                            onClick={() => setSelectedCategoryPage(categoryId)}
-                                        >
-                                            <h4>{categoryName}</h4>
-                                            <p>{cat.description}</p>
-                                            <small style={styles.productCount}>{productCount} product(s)</small>
-                                            <div style={styles.viewProductsButton}>View Products →</div>
-                                        </div>
-                                    );
-                                })}
+                                {categories.length === 0 ? (
+                                    <p>Loading categories...</p>
+                                ) : (
+                                    categories.map((cat) => {
+                                        const categoryId = cat.category_id || cat.id;
+                                        const categoryName = cat.category_name || cat.name;
+                                        const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
+                                        return (
+                                            <div 
+                                                key={categoryId} 
+                                                style={styles.categoryCard}
+                                                onClick={() => setSelectedCategoryPage(categoryId)}
+                                            >
+                                                <h4>{categoryName}</h4>
+                                                <p>{cat.description}</p>
+                                                <small style={styles.productCount}>{productCount} product(s)</small>
+                                                <div style={styles.viewProductsButton}>View Products →</div>
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </div>
                         
@@ -719,7 +755,7 @@ function App() {
                 )}
             </div>
             
-            {/* Add Product Modal - ADMIN ONLY */}
+            {/* Add Product Modal */}
             {showProductForm && !selectedCategoryPage && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -745,7 +781,7 @@ function App() {
                 </div>
             )}
             
-            {/* Edit Product Modal - ADMIN ONLY */}
+            {/* Edit Product Modal */}
             {editingProduct && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -857,7 +893,7 @@ function App() {
                 </div>
             )}
             
-            {/* Report Modal - ADMIN ONLY */}
+            {/* Report Modal */}
             {showReportModal && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -866,24 +902,8 @@ function App() {
                             <button onClick={() => setShowReportModal(false)} style={styles.closeButton}>×</button>
                         </div>
                         <div style={styles.reportOptions}>
-                            <button 
-                                onClick={() => {
-                                    setReportType('inventory');
-                                    generatePDF();
-                                }} 
-                                style={styles.reportOptionButton}
-                            >
-                                📦 Inventory Report
-                            </button>
-                            <button 
-                                onClick={() => {
-                                    setReportType('sales');
-                                    generatePDF();
-                                }} 
-                                style={styles.reportOptionButton}
-                            >
-                                💰 Sales Report
-                            </button>
+                            <button onClick={() => { setReportType('inventory'); generatePDF(); }} style={styles.reportOptionButton}>📦 Inventory Report</button>
+                            <button onClick={() => { setReportType('sales'); generatePDF(); }} style={styles.reportOptionButton}>💰 Sales Report</button>
                         </div>
                     </div>
                 </div>
