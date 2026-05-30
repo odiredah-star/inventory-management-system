@@ -13,27 +13,29 @@ let users = [
     { id: '2', full_name: 'Staff Member', email: 'staff@inventory.com', password_hash: 'Staff123', role: 'staff', status: 'active' }
 ];
 
+// FIXED: Categories with correct field names that frontend expects
 let categories = [
-    { id: '1', category_name: 'Electronics', description: 'Electronic devices' },
-    { id: '2', category_name: 'Clothing', description: 'Apparel and fashion' },
-    { id: '3', category_name: 'Furniture', description: 'Home and office furniture' }
+    { category_id: '1', category_name: 'Electronics', description: 'Electronic devices and accessories' },
+    { category_id: '2', category_name: 'Clothing', description: 'Apparel and fashion items' },
+    { category_id: '3', category_name: 'Furniture', description: 'Home and office furniture' }
 ];
 
+// FIXED: Products with category_id matching categories
 let products = [
-    { id: '1', name: 'Laptop', price: 999.99, quantity_in_stock: 50, category_id: '1', status: 'active' },
-    { id: '2', name: 'T-Shirt', price: 19.99, quantity_in_stock: 100, category_id: '2', status: 'active' },
-    { id: '3', name: 'Office Chair', price: 199.99, quantity_in_stock: 25, category_id: '3', status: 'active' }
+    { product_id: '1', name: 'Laptop', price: 999.99, quantity_in_stock: 50, category_id: '1', status: 'active' },
+    { product_id: '2', name: 'T-Shirt', price: 19.99, quantity_in_stock: 100, category_id: '2', status: 'active' },
+    { product_id: '3', name: 'Office Chair', price: 199.99, quantity_in_stock: 25, category_id: '3', status: 'active' }
 ];
 
 let suppliers = [
-    { id: '1', supplier_name: 'Tech Distributors', email: 'contact@techdist.com', phone: '+1-555-0101', status: 'active' },
-    { id: '2', supplier_name: 'Fashion Wholesale', email: 'sales@fashionwholesale.com', phone: '+1-555-0102', status: 'active' },
-    { id: '3', supplier_name: 'Furniture Mart', email: 'orders@furnituremart.com', phone: '+1-555-0103', status: 'active' }
+    { supplier_id: '1', supplier_name: 'Tech Distributors', email: 'contact@techdist.com', phone: '+1-555-0101', status: 'active' },
+    { supplier_id: '2', supplier_name: 'Fashion Wholesale', email: 'sales@fashionwholesale.com', phone: '+1-555-0102', status: 'active' },
+    { supplier_id: '3', supplier_name: 'Furniture Mart', email: 'orders@furnituremart.com', phone: '+1-555-0103', status: 'active' }
 ];
 
 let customers = [
-    { id: '1', customer_name: 'John Smith', email: 'john@example.com', phone: '555-0101', loyalty_points: 100, total_purchases: 0 },
-    { id: '2', customer_name: 'Sarah Johnson', email: 'sarah@example.com', phone: '555-0102', loyalty_points: 250, total_purchases: 0 }
+    { customer_id: '1', customer_name: 'John Smith', email: 'john@example.com', phone: '555-0101', loyalty_points: 100, total_purchases: 0 },
+    { customer_id: '2', customer_name: 'Sarah Johnson', email: 'sarah@example.com', phone: '555-0102', loyalty_points: 250, total_purchases: 0 }
 ];
 
 let purchases = [];
@@ -42,7 +44,7 @@ let sales = [];
 // ========== HELPER FUNCTIONS ==========
 const getProductWithCategory = (product) => ({
     ...product,
-    categories: categories.find(c => c.id === product.category_id)
+    categories: categories.find(c => c.category_id === product.category_id)
 });
 
 // ========== AUTH MIDDLEWARE ==========
@@ -63,7 +65,7 @@ const authenticate = (req, res, next) => {
     next();
 };
 
-// ADMIN ONLY MIDDLEWARE - For reports and admin-only features
+// ADMIN ONLY MIDDLEWARE
 const adminOnly = (req, res, next) => {
     if (!req.user || req.user.role !== 'admin') {
         return res.status(403).json({ success: false, error: 'Admin access required' });
@@ -108,18 +110,20 @@ app.get('/api/v1/categories', authenticate, (req, res) => {
 
 // ========== PRODUCTS ==========
 app.get('/api/v1/products', authenticate, (req, res) => {
-    const productsWithCats = products.map(getProductWithCategory);
+    const productsWithCats = products.map(p => ({
+        ...p,
+        categories: categories.find(c => c.category_id === p.category_id)
+    }));
     res.json({ success: true, data: productsWithCats });
 });
 
 app.post('/api/v1/products', authenticate, (req, res) => {
-    // Only admin can add products
     if (req.user.role !== 'admin') {
         return res.status(403).json({ success: false, error: 'Admin access required' });
     }
     
     const newProduct = {
-        id: String(products.length + 1),
+        product_id: String(products.length + 1),
         name: req.body.name,
         price: parseFloat(req.body.price),
         quantity_in_stock: parseInt(req.body.quantity_in_stock),
@@ -131,7 +135,6 @@ app.post('/api/v1/products', authenticate, (req, res) => {
 });
 
 app.put('/api/v1/products/:id', authenticate, (req, res) => {
-    // Only admin can edit products
     if (req.user.role !== 'admin') {
         return res.status(403).json({ success: false, error: 'Admin access required' });
     }
@@ -139,7 +142,7 @@ app.put('/api/v1/products/:id', authenticate, (req, res) => {
     const { id } = req.params;
     const { name, price, quantity_in_stock, category_id } = req.body;
     
-    const productIndex = products.findIndex(p => p.id === id);
+    const productIndex = products.findIndex(p => p.product_id === id);
     if (productIndex === -1) {
         return res.status(404).json({ success: false, error: 'Product not found' });
     }
@@ -156,12 +159,11 @@ app.put('/api/v1/products/:id', authenticate, (req, res) => {
 });
 
 app.delete('/api/v1/products/:id', authenticate, (req, res) => {
-    // Only admin can delete products
     if (req.user.role !== 'admin') {
         return res.status(403).json({ success: false, error: 'Admin access required' });
     }
     
-    products = products.filter(p => p.id !== req.params.id);
+    products = products.filter(p => p.product_id !== req.params.id);
     res.json({ success: true, message: 'Product deleted' });
 });
 
@@ -177,7 +179,7 @@ app.get('/api/v1/customers', authenticate, (req, res) => {
 
 app.post('/api/v1/customers', authenticate, (req, res) => {
     const newCustomer = {
-        id: String(customers.length + 1),
+        customer_id: String(customers.length + 1),
         customer_name: req.body.name,
         email: req.body.email,
         phone: req.body.phone,
@@ -192,7 +194,7 @@ app.post('/api/v1/customers', authenticate, (req, res) => {
 app.get('/api/v1/purchases', authenticate, (req, res) => {
     const purchasesWithSuppliers = purchases.map(p => ({
         ...p,
-        suppliers: suppliers.find(s => s.id === p.supplier_id)
+        suppliers: suppliers.find(s => s.supplier_id === p.supplier_id)
     }));
     res.json({ success: true, data: purchasesWithSuppliers });
 });
@@ -211,9 +213,8 @@ app.post('/api/v1/purchases', authenticate, (req, res) => {
     };
     purchases.unshift(newPurchase);
     
-    // Update stock
     items.forEach(item => {
-        const product = products.find(p => p.id === item.product_id);
+        const product = products.find(p => p.product_id === item.product_id);
         if (product) product.quantity_in_stock += parseInt(item.quantity);
     });
     
@@ -224,7 +225,7 @@ app.post('/api/v1/purchases', authenticate, (req, res) => {
 app.get('/api/v1/sales', authenticate, (req, res) => {
     const salesWithCustomers = sales.map(s => ({
         ...s,
-        customer: customers.find(c => c.id === s.customer_id)
+        customer: customers.find(c => c.customer_id === s.customer_id)
     }));
     res.json({ success: true, data: salesWithCustomers });
 });
@@ -232,9 +233,8 @@ app.get('/api/v1/sales', authenticate, (req, res) => {
 app.post('/api/v1/sales', authenticate, (req, res) => {
     const { customer_id, items, payment_method } = req.body;
     
-    // Check stock
     for (const item of items) {
-        const product = products.find(p => p.id === item.product_id);
+        const product = products.find(p => p.product_id === item.product_id);
         if (!product || product.quantity_in_stock < item.quantity) {
             return res.status(400).json({ success: false, error: `Insufficient stock for ${product?.name}` });
         }
@@ -242,7 +242,7 @@ app.post('/api/v1/sales', authenticate, (req, res) => {
     
     let total_amount = 0;
     const saleItems = items.map(item => {
-        const product = products.find(p => p.id === item.product_id);
+        const product = products.find(p => p.product_id === item.product_id);
         const subtotal = product.price * item.quantity;
         total_amount += subtotal;
         return {
@@ -266,15 +266,13 @@ app.post('/api/v1/sales', authenticate, (req, res) => {
     };
     sales.unshift(newSale);
     
-    // Deduct stock
     items.forEach(item => {
-        const product = products.find(p => p.id === item.product_id);
+        const product = products.find(p => p.product_id === item.product_id);
         if (product) product.quantity_in_stock -= parseInt(item.quantity);
     });
     
-    // Update customer loyalty points
     if (customer_id) {
-        const customer = customers.find(c => c.id === customer_id);
+        const customer = customers.find(c => c.customer_id === customer_id);
         if (customer) {
             customer.loyalty_points += Math.floor(total_amount / 10);
             customer.total_purchases += total_amount;
@@ -295,14 +293,17 @@ app.get('/api/v1/sales/stats', authenticate, (req, res) => {
 
 // ========== REPORTS (ADMIN ONLY) ==========
 app.get('/api/v1/reports/inventory', authenticate, adminOnly, (req, res) => {
-    const productsWithCats = products.map(getProductWithCategory);
+    const productsWithCats = products.map(p => ({
+        ...p,
+        categories: categories.find(c => c.category_id === p.category_id)
+    }));
     res.json({ success: true, data: productsWithCats });
 });
 
 app.get('/api/v1/reports/sales', authenticate, adminOnly, (req, res) => {
     const salesWithCustomers = sales.map(s => ({
         ...s,
-        customer: customers.find(c => c.id === s.customer_id)
+        customer: customers.find(c => c.customer_id === s.customer_id)
     }));
     res.json({ success: true, data: salesWithCustomers, stats: { totalSales: sales.reduce((sum, s) => sum + s.total_amount, 0) } });
 });
@@ -312,5 +313,6 @@ app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📝 Admin: admin@inventory.com / Admin123 (Full Access)`);
     console.log(`📝 Staff: staff@inventory.com / Staff123 (Limited Access)`);
+    console.log(`📦 Categories: Electronics, Clothing, Furniture`);
     console.log(`🔒 Reports are ONLY available to Admin users`);
 });
