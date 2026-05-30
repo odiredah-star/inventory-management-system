@@ -116,7 +116,7 @@ function App() {
         }
     };
 
-    // ========== REPORT FUNCTIONS ==========
+    // ========== REPORT FUNCTIONS (ADMIN ONLY) ==========
     const generatePDF = async () => {
         try {
             const { jsPDF } = await import('jspdf');
@@ -456,8 +456,12 @@ function App() {
                                                 </td>
                                                 <td>{categoryName}</td>
                                                 <td>
-                                                    <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
-                                                    <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                                    {user?.role === 'admin' && (
+                                                        <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
+                                                    )}
+                                                    {user?.role === 'admin' && (
+                                                        <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                                    )}
                                                 </td>
                                             </tr>
                                         ))
@@ -522,11 +526,14 @@ function App() {
             <div style={styles.dashboard}>
                 {activeTab === 'dashboard' && (
                     <>
-                        <div style={styles.reportButtonContainer}>
-                            <button onClick={() => setShowReportModal(true)} style={styles.reportButton}>
-                                📊 Generate Report
-                            </button>
-                        </div>
+                        {/* Report Button - ADMIN ONLY */}
+                        {user?.role === 'admin' && (
+                            <div style={styles.reportButtonContainer}>
+                                <button onClick={() => setShowReportModal(true)} style={styles.reportButton}>
+                                    📊 Generate Report
+                                </button>
+                            </div>
+                        )}
                         
                         <div style={styles.statsGrid}>
                             <div style={styles.statCard}><h3>Total Products</h3><p style={styles.statNumber}>{products.length}</p></div>
@@ -592,7 +599,9 @@ function App() {
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
                             <h3 style={styles.sectionTitle}>All Products</h3>
-                            <button onClick={() => setShowProductForm(true)} style={styles.addButton}>+ Add Product</button>
+                            {user?.role === 'admin' && (
+                                <button onClick={() => setShowProductForm(true)} style={styles.addButton}>+ Add Product</button>
+                            )}
                         </div>
                         <div style={styles.productTable}>
                             <table style={styles.table}>
@@ -621,8 +630,12 @@ function App() {
                                             </td>
                                             <td>{product.categories?.category_name || 'Uncategorized'}</td>
                                             <td>
-                                                <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
-                                                <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                                {user?.role === 'admin' && (
+                                                    <>
+                                                        <button onClick={() => handleEditProduct(product)} style={styles.editButton}>Edit</button>
+                                                        <button onClick={() => handleDeleteProduct(product.product_id || product.id)} style={styles.deleteButton}>Delete</button>
+                                                    </>
+                                                )}
                                             </td>
                                         </tr>
                                     ))}
@@ -701,8 +714,8 @@ function App() {
                 )}
             </div>
             
-            {/* Add Product Modal */}
-            {showProductForm && !selectedCategoryPage && (
+            {/* Add Product Modal - ADMIN ONLY */}
+            {showProductForm && !selectedCategoryPage && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
                         <div style={styles.modalHeader}>
@@ -727,8 +740,8 @@ function App() {
                 </div>
             )}
             
-            {/* Edit Product Modal */}
-            {editingProduct && (
+            {/* Edit Product Modal - ADMIN ONLY */}
+            {editingProduct && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
                         <div style={styles.modalHeader}>
@@ -839,8 +852,8 @@ function App() {
                 </div>
             )}
             
-            {/* Report Modal */}
-            {showReportModal && (
+            {/* Report Modal - ADMIN ONLY */}
+            {showReportModal && user?.role === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
                         <div style={styles.modalHeader}>
