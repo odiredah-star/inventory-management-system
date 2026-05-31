@@ -309,6 +309,84 @@ app.get('/api/v1/reports/sales', authenticate, adminOnly, (req, res) => {
 });
 
 // ========== START SERVER ==========
+// ========== USER MANAGEMENT (ADMIN ONLY) ==========
+// In-memory user storage (since Supabase is giving issues)
+let staffUsers = [
+    { id: '1', full_name: 'Admin User', email: 'admin@inventory.com', password_hash: 'Admin123', role: 'admin', status: 'active', created_at: new Date().toISOString() },
+    { id: '2', full_name: 'Staff Member', email: 'staff@inventory.com', password_hash: 'Staff123', role: 'staff', status: 'active', created_at: new Date().toISOString() }
+];
+
+// Get all users
+app.get('/api/v1/users', authenticate, adminOnly, (req, res) => {
+    console.log('GET /api/v1/users - Returning users list');
+    const safeUsers = staffUsers.map(u => ({
+        id: u.id,
+        full_name: u.full_name,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        created_at: u.created_at
+    }));
+    res.json({ success: true, data: safeUsers });
+});
+
+// Create new user
+app.post('/api/v1/users', authenticate, adminOnly, (req, res) => {
+    const { full_name, email, password, role } = req.body;
+    
+    console.log('POST /api/v1/users - Creating user:', { full_name, email, role });
+    
+    // Check if user exists
+    const existingUser = staffUsers.find(u => u.email === email);
+    if (existingUser) {
+        return res.status(400).json({ success: false, error: 'Email already exists' });
+    }
+    
+    const newUser = {
+        id: String(staffUsers.length + 1),
+        full_name,
+        email,
+        password_hash: password,
+        role: role || 'staff',
+        status: 'active',
+        created_at: new Date().toISOString()
+    };
+    
+    staffUsers.push(newUser);
+    console.log('User created:', newUser);
+    
+    res.json({ 
+        success: true, 
+        message: 'User created successfully',
+        data: {
+            id: newUser.id,
+            full_name: newUser.full_name,
+            email: newUser.email,
+            role: newUser.role,
+            status: newUser.status,
+            created_at: newUser.created_at
+        }
+    });
+});
+
+// Delete user
+app.delete('/api/v1/users/:id', authenticate, adminOnly, (req, res) => {
+    const { id } = req.params;
+    console.log('DELETE /api/v1/users - Deleting user id:', id);
+    
+    const userToDelete = staffUsers.find(u => u.id === id);
+    if (!userToDelete) {
+        return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    
+    if (userToDelete.email === 'admin@inventory.com') {
+        return res.status(400).json({ success: false, error: 'Cannot delete master admin account' });
+    }
+    
+    staffUsers = staffUsers.filter(u => u.id !== id);
+    res.json({ success: true, message: 'User deleted successfully' });
+});
+
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
     console.log(`📝 Admin: admin@inventory.com / Admin123 (Full Access)`);
