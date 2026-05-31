@@ -88,7 +88,7 @@ function App() {
                 localStorage.setItem('token', data.data.accessToken);
                 localStorage.setItem('user', JSON.stringify(data.data.user));
                 setMessage(`Welcome ${data.data.user.full_name}!`);
-                await loadAllData();
+                loadAllData();
             } else {
                 setMessage('Login failed: ' + data.error);
             }
@@ -103,37 +103,30 @@ function App() {
             const token = localStorage.getItem('token');
             const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
             
-            // Load products
             const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
             const prodData = await prodRes.json();
             if (prodData.success) setProducts(prodData.data || []);
             
-            // Load suppliers
             const supRes = await fetch(`${API_URL}/api/v1/suppliers`, { headers });
             const supData = await supRes.json();
             if (supData.success) setSuppliers(supData.data || []);
             
-            // Load customers
             const custRes = await fetch(`${API_URL}/api/v1/customers`, { headers });
             const custData = await custRes.json();
             if (custData.success) setCustomers(custData.data || []);
             
-            // Load purchases
             const purRes = await fetch(`${API_URL}/api/v1/purchases`, { headers });
             const purData = await purRes.json();
             if (purData.success) setPurchases(purData.data || []);
             
-            // Load sales
             const saleRes = await fetch(`${API_URL}/api/v1/sales`, { headers });
             const saleData = await saleRes.json();
             if (saleData.success) setSales(saleData.data || []);
             
-            // Load sales stats
             const statsRes = await fetch(`${API_URL}/api/v1/sales/stats`, { headers });
             const statsData = await statsRes.json();
             if (statsData.success) setSalesStats(statsData.data);
             
-            // Load users (admin only)
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             if (storedUser?.role === 'admin') {
                 const usersRes = await fetch(`${API_URL}/api/v1/users`, { headers });
@@ -574,7 +567,7 @@ function App() {
                                         <th>Stock</th>
                                         <th>Category</th>
                                         <th>Actions</th>
-                                    </td>
+                                    </tr>
                                 </thead>
                                 <tbody>
                                     {categoryProducts.length === 0 ? (
@@ -731,6 +724,11 @@ function App() {
                                                 <td>{sale.items_count || 0} items</td>
                                             </tr>
                                         ))}
+                                        {sales.length === 0 && (
+                                            <tr>
+                                                <td colSpan="5" style={styles.noData}>No sales yet</td>
+                                            </tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -785,6 +783,11 @@ function App() {
                                             </tr>
                                         );
                                     })}
+                                    {products.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" style={styles.noData}>No products yet</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -818,6 +821,11 @@ function App() {
                                             <td>{purchase.items_count || 0} items</td>
                                         </tr>
                                     ))}
+                                    {purchases.length === 0 && (
+                                        <tr>
+                                            <td colSpan="5" style={styles.noData}>No purchases yet</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -853,6 +861,11 @@ function App() {
                                             <td>{sale.items_count || 0} items</td>
                                         </tr>
                                     ))}
+                                    {sales.length === 0 && (
+                                        <tr>
+                                            <td colSpan="6" style={styles.noData}>No sales yet</td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -889,31 +902,36 @@ function App() {
                                                 }}>
                                                     {u.role}
                                                 </span>
-                                             </td>
-                                             <td>
+                                            </td>
+                                            <td>
                                                 <span style={{
                                                     ...styles.statusBadge,
                                                     backgroundColor: u.status === 'active' ? '#28a745' : '#dc3545'
                                                 }}>
                                                     {u.status}
                                                 </span>
-                                             </td>
-                                             <td>{new Date(u.created_at).toLocaleDateString()}</td>
-                                             <td>
+                                            </td>
+                                            <td>{new Date(u.created_at).toLocaleDateString()}</td>
+                                            <td>
                                                 {u.email !== 'admin@inventory.com' && (
                                                     <button onClick={() => handleDeleteUser(u.id, u.email)} style={styles.deleteButton}>Delete</button>
                                                 )}
-                                             </td>
-                                         </tr>
+                                            </td>
+                                        </tr>
                                     ))}
+                                    {users.length === 0 && (
+                                        <tr>
+                                            <td colSpan="6" style={styles.noData}>No users found</td>
+                                        </tr>
+                                    )}
                                 </tbody>
-                             </table>
+                            </table>
                         </div>
                     </div>
                 )}
             </div>
             
-            {/* Add Product Modal */}
+            {/* Modals - same as before but kept concise */}
             {showProductForm && !selectedCategoryPage && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -939,7 +957,6 @@ function App() {
                 </div>
             )}
             
-            {/* Edit Product Modal */}
             {editingProduct && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -965,7 +982,6 @@ function App() {
                 </div>
             )}
             
-            {/* User Form Modal */}
             {showUserForm && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -987,7 +1003,6 @@ function App() {
                 </div>
             )}
             
-            {/* Purchase Modal */}
             {showPurchaseForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
@@ -1027,7 +1042,6 @@ function App() {
                 </div>
             )}
             
-            {/* Sale Modal */}
             {showSaleForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
@@ -1073,7 +1087,6 @@ function App() {
                 </div>
             )}
             
-            {/* Report Modal */}
             {showReportModal && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
