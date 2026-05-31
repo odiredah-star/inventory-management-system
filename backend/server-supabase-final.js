@@ -110,17 +110,19 @@ app.get('/api/v1/products', authenticate, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('products')
-            .select(`
-                *,
-                categories:category_id (id, name)
-            `)
+            .select('*')
             .order('name');
         
         if (error) throw error;
         
+        // Get categories to add category names
+        const { data: categories } = await supabase
+            .from('categories')
+            .select('id, name');
+        
         const formatted = data.map(p => ({
             ...p,
-            categories: p.categories ? { category_name: p.categories.name } : null
+            category_name: categories?.find(c => c.id === p.category_id)?.name || 'Uncategorized'
         }));
         
         res.json({ success: true, data: formatted });
@@ -231,10 +233,7 @@ app.get('/api/v1/purchases', authenticate, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('purchases')
-            .select(`
-                *,
-                suppliers:supplier_id (id, supplier_name)
-            `)
+            .select('*')
             .order('purchase_date', { ascending: false });
         
         if (error) throw error;
@@ -288,10 +287,7 @@ app.get('/api/v1/sales', authenticate, async (req, res) => {
     try {
         const { data, error } = await supabase
             .from('sales')
-            .select(`
-                *,
-                customers:customer_id (id, customer_name)
-            `)
+            .select('*')
             .order('sale_date', { ascending: false });
         
         if (error) throw error;
@@ -487,5 +483,5 @@ app.listen(PORT, () => {
     console.log(`✅ Data is now PERSISTENT!`);
     console.log(`📝 Admin: admin@inventory.com / Admin123`);
     console.log(`📝 Staff: staff@inventory.com / Staff123`);
-    console.log(`👥 User Management enabled for Admin users`);
+    console.log(`👥 User Management endpoints active`);
 });
