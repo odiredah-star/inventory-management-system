@@ -1,7 +1,7 @@
 import toast, { Toaster } from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
 
-const API_URL = 'https://inventory-management-system-1-yji6.onrender.com/';
+const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
 
 // HARDCODED CATEGORIES - These will ALWAYS show
 const HARDCODED_CATEGORIES = [
