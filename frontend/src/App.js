@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import toast, { Toaster } from 'react-hot-toast';
+import React, { useState, useEffect, useRef } from 'react';
 
-const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
+const API_URL = 'http://localhost:5000';
 
 // HARDCODED CATEGORIES - These will ALWAYS show
 const HARDCODED_CATEGORIES = [
@@ -27,6 +28,15 @@ function App() {
     const [sales, setSales] = useState([]);
     const [salesStats, setSalesStats] = useState({ totalSales: 0, todaySales: 0, saleCount: 0 });
     const [users, setUsers] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    
+    // Create a ref to always have the latest products
+    const productsRef = useRef(products);
+    
+    // Update ref when products change
+    useEffect(() => {
+        productsRef.current = products;
+    }, [products]);
     
     // ========== UI STATES ==========
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -68,6 +78,73 @@ function App() {
         return parseFloat(price).toFixed(2);
     };
 
+    // ========== CHECK LOW STOCK ALERTS ==========
+    const checkLowStockAlerts = (showAll = false, productsToCheck = null) => {
+        // Use provided products or ref for latest products
+        const currentProducts = productsToCheck || productsRef.current;
+        
+        // Get user role from localStorage directly as fallback
+        const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const currentUserRole = user?.role || storedUser?.role;
+        
+        console.log("🔔 checkLowStockAlerts() called!", "showAll:", showAll);
+        console.log("Current user role:", currentUserRole);
+        console.log("Products count:", currentProducts.length);
+        
+        // Only show alerts for admin
+        if (currentUserRole !== 'admin') {
+            console.log("Not admin, skipping alerts");
+            return;
+        }
+        
+        if (!currentProducts || currentProducts.length === 0) {
+            console.log("No products available");
+            return;
+        }
+        
+        const lowStockProducts = currentProducts.filter(p => p.quantity_in_stock <= 10 && p.quantity_in_stock > 0);
+        const outOfStockProducts = currentProducts.filter(p => p.quantity_in_stock === 0);
+        
+        console.log("Low stock products:", lowStockProducts.length);
+        console.log("Out of stock products:", outOfStockProducts.length);
+        
+        // Show all alerts immediately
+        let delay = 0;
+        
+        // Show all low stock products
+        lowStockProducts.forEach(product => {
+            const productId = product.product_id || product.id;
+            const alertKey = `low_stock_${productId}`;
+            if (showAll || !sessionStorage.getItem(alertKey)) {
+                setTimeout(() => {
+                    toast.error(`⚠️ Low Stock: ${product.name} has only ${product.quantity_in_stock} left!`, {
+                        duration: 5000,
+                        position: 'top-center'
+                    });
+                }, delay);
+                delay += 800;
+                sessionStorage.setItem(alertKey, 'shown');
+                console.log(`Toast scheduled for ${product.name}`);
+            }
+        });
+        
+        // Show all out of stock products
+        outOfStockProducts.forEach(product => {
+            const productId = product.product_id || product.id;
+            const alertKey = `out_of_stock_${productId}`;
+            if (showAll || !sessionStorage.getItem(alertKey)) {
+                setTimeout(() => {
+                    toast.error(`❌ Out of Stock: ${product.name} is sold out!`, {
+                        duration: 5000,
+                        position: 'top-center'
+                    });
+                }, delay);
+                delay += 800;
+                sessionStorage.setItem(alertKey, 'shown');
+            }
+        });
+    };
+
     // ========== LOGIN FUNCTION ==========
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -88,7 +165,9 @@ function App() {
                 localStorage.setItem('token', data.data.accessToken);
                 localStorage.setItem('user', JSON.stringify(data.data.user));
                 setMessage(`Welcome ${data.data.user.full_name}!`);
-                loadAllData();
+                const loadedProducts = await loadAllData();
+                // Show alerts with the loaded products directly
+                setTimeout(() => checkLowStockAlerts(true, loadedProducts), 500);
             } else {
                 setMessage('Login failed: ' + data.error);
             }
@@ -99,13 +178,31 @@ function App() {
 
     // ========== LOAD ALL DATA ==========
     const loadAllData = async () => {
+        if (isLoading) return;
+        setIsLoading(true);
+        
+        let loadedProducts = [];
+        
         try {
             const token = localStorage.getItem('token');
+            if (!token) {
+                console.warn('No token found');
+                setIsLoading(false);
+                return [];
+            }
+            
             const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
             
+            console.log("Loading products...");
             const prodRes = await fetch(`${API_URL}/api/v1/products`, { headers });
             const prodData = await prodRes.json();
-            if (prodData.success) setProducts(prodData.data || []);
+            if (prodData.success) {
+                console.log("Products loaded:", prodData.data?.length || 0);
+                loadedProducts = prodData.data || [];
+                setProducts(loadedProducts);
+            } else {
+                console.error("Failed to load products:", prodData.error);
+            }
             
             const supRes = await fetch(`${API_URL}/api/v1/suppliers`, { headers });
             const supData = await supRes.json();
@@ -129,16 +226,30 @@ function App() {
             
             const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
             if (storedUser?.role === 'admin') {
-                const usersRes = await fetch(`${API_URL}/api/v1/users`, { headers });
-                const usersData = await usersRes.json();
-                if (usersData.success) setUsers(usersData.data || []);
+                try {
+                    const usersRes = await fetch(`${API_URL}/api/v1/users`, { headers });
+                    if (usersRes.ok) {
+                        const usersData = await usersRes.json();
+                        if (usersData.success) setUsers(usersData.data || []);
+                    } else {
+                        console.warn('Users endpoint not available (404 is ok if not implemented)');
+                        setUsers([]);
+                    }
+                } catch (userErr) {
+                    console.warn('Could not load users:', userErr.message);
+                    setUsers([]);
+                }
             }
             
+            return loadedProducts;
         } catch (error) {
             console.error('Error loading data:', error);
+            return [];
+        } finally {
+            setIsLoading(false);
         }
     };
-
+    
     // ========== USER MANAGEMENT FUNCTIONS ==========
     const handleAddUser = async (e) => {
         e.preventDefault();
@@ -303,6 +414,26 @@ function App() {
         }
     };
 
+    // ========== PURCHASE ITEM FUNCTIONS ==========
+    const addPurchaseItem = () => {
+        setNewPurchase({
+            ...newPurchase,
+            items: [...newPurchase.items, { product_id: '', quantity: '', cost_price: '' }]
+        });
+    };
+
+    const removePurchaseItem = (index) => {
+        const items = [...newPurchase.items];
+        items.splice(index, 1);
+        setNewPurchase({ ...newPurchase, items });
+    };
+
+    const handlePurchaseItemChange = (index, field, value) => {
+        const items = [...newPurchase.items];
+        items[index][field] = value;
+        setNewPurchase({ ...newPurchase, items });
+    };
+
     // ========== PRODUCT FUNCTIONS ==========
     const handleAddProduct = async (e) => {
         e.preventDefault();
@@ -322,7 +453,7 @@ function App() {
             if (data.success) {
                 setShowProductForm(false);
                 setNewProduct({ name: '', price: '', quantity_in_stock: '', category_id: '' });
-                loadAllData();
+                const loadedProducts = await loadAllData();
                 setMessage('Product added!');
                 setTimeout(() => setMessage(''), 3000);
             } else {
@@ -333,15 +464,16 @@ function App() {
         }
     };
 
-    const handleDeleteProduct = async (productId) => {
+    const handleDeleteProduct = async (id) => {
         if (!window.confirm('Delete this product?')) return;
         const token = localStorage.getItem('token');
         try {
-            await fetch(`${API_URL}/api/v1/products/${productId}`, { 
+            await fetch(`${API_URL}/api/v1/products/${id}`, { 
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            loadAllData();
+            const loadedProducts = await loadAllData();
+            setTimeout(() => checkLowStockAlerts(true, loadedProducts), 500);
             setMessage('Product deleted');
             setTimeout(() => setMessage(''), 3000);
         } catch (error) {
@@ -378,7 +510,7 @@ function App() {
             if (data.success) {
                 setEditingProduct(null);
                 setEditProductData({ name: '', price: '', quantity_in_stock: '', category_id: '' });
-                loadAllData();
+                const loadedProducts = await loadAllData();
                 setMessage('Product updated successfully!');
                 setTimeout(() => setMessage(''), 3000);
             } else {
@@ -403,7 +535,7 @@ function App() {
             if (data.success) {
                 setShowPurchaseForm(false);
                 setNewPurchase({ supplier_id: '', items: [{ product_id: '', quantity: '', cost_price: '' }] });
-                loadAllData();
+                await loadAllData();
                 setMessage('Purchase recorded!');
                 setTimeout(() => setMessage(''), 3000);
             } else {
@@ -414,50 +546,7 @@ function App() {
         }
     };
 
-    const addPurchaseItem = () => {
-        setNewPurchase({
-            ...newPurchase,
-            items: [...newPurchase.items, { product_id: '', quantity: '', cost_price: '' }]
-        });
-    };
-
-    const removePurchaseItem = (index) => {
-        const items = [...newPurchase.items];
-        items.splice(index, 1);
-        setNewPurchase({ ...newPurchase, items });
-    };
-
-    const handlePurchaseItemChange = (index, field, value) => {
-        const items = [...newPurchase.items];
-        items[index][field] = value;
-        setNewPurchase({ ...newPurchase, items });
-    };
-
-    // ========== SALE FUNCTIONS ==========
-    const handleAddSale = async (e) => {
-        e.preventDefault();
-        const token = localStorage.getItem('token');
-        try {
-            const response = await fetch(`${API_URL}/api/v1/sales`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                body: JSON.stringify(newSale)
-            });
-            const data = await response.json();
-            if (data.success) {
-                setShowSaleForm(false);
-                setNewSale({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
-                loadAllData();
-                setMessage('Sale recorded!');
-                setTimeout(() => setMessage(''), 3000);
-            } else {
-                setMessage(data.error || 'Failed to record sale');
-            }
-        } catch (error) {
-            setMessage('Error: ' + error.message);
-        }
-    };
-
+    // ========== SALE ITEM FUNCTIONS ==========
     const addSaleItem = () => {
         setNewSale({
             ...newSale,
@@ -476,12 +565,40 @@ function App() {
         items[index][field] = value;
         setNewSale({ ...newSale, items });
     };
+    
+    // ========== SALE FUNCTIONS ==========
+    const handleAddSale = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('token');
+        try {
+            const response = await fetch(`${API_URL}/api/v1/sales`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(newSale)
+            });
+            const data = await response.json();
+            if (data.success) {
+                setShowSaleForm(false);
+                setNewSale({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
+                const loadedProducts = await loadAllData();
+                // Show ALL alerts immediately after sale with the loaded products
+                setTimeout(() => checkLowStockAlerts(true, loadedProducts), 300);
+                setMessage('Sale recorded!');
+                setTimeout(() => setMessage(''), 3000);
+            } else {
+                setMessage(data.error || 'Failed to record sale');
+            }
+        } catch (error) {
+            setMessage('Error: ' + error.message);
+        }
+    };
 
     // ========== LOGOUT ==========
     const handleLogout = () => {
         setIsLoggedIn(false);
         setUser(null);
         localStorage.clear();
+        sessionStorage.clear();
         setMessage('Logged out');
     };
 
@@ -533,6 +650,7 @@ function App() {
         
         return (
             <div style={styles.appContainer}>
+                <Toaster position="top-center" reverseOrder={false} />
                 <nav style={styles.navbar}>
                     <h2 style={styles.navTitle}>Inventory System</h2>
                     <div style={styles.navRight}>
@@ -541,16 +659,12 @@ function App() {
                         <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
                     </div>
                 </nav>
-                
                 <div style={styles.categoryPageContainer}>
                     <div style={styles.categoryPageHeader}>
-                        <button onClick={() => setSelectedCategoryPage(null)} style={styles.backButton}>
-                            ← Back to Dashboard
-                        </button>
+                        <button onClick={() => setSelectedCategoryPage(null)} style={styles.backButton}>← Back to Dashboard</button>
                         <h1 style={styles.categoryPageTitle}>{categoryName}</h1>
                         <p style={styles.categoryPageCount}>{categoryProducts.length} products in this category</p>
                     </div>
-                    
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
                             <h3 style={styles.sectionTitle}>Products in {categoryName}</h3>
@@ -605,7 +719,6 @@ function App() {
                         </div>
                     </div>
                 </div>
-                
                 {showProductForm && (
                     <div style={styles.modalOverlay}>
                         <div style={styles.modal}>
@@ -629,6 +742,7 @@ function App() {
     // ========== MAIN DASHBOARD SCREEN ==========
     return (
         <div style={styles.appContainer}>
+            <Toaster position="top-center" reverseOrder={false} />
             <nav style={styles.navbar}>
                 <h2 style={styles.navTitle}>Inventory System</h2>
                 <div style={styles.navRight}>
@@ -637,7 +751,6 @@ function App() {
                     <button onClick={handleLogout} style={styles.logoutButton}>Logout</button>
                 </div>
             </nav>
-            
             <div style={styles.tabs}>
                 {isMobile ? (
                     <select value={activeTab} onChange={(e) => setActiveTab(e.target.value)} style={styles.mobileSelect}>
@@ -659,25 +772,20 @@ function App() {
                     </>
                 )}
             </div>
-            
             <div style={styles.dashboard}>
                 {activeTab === 'dashboard' && (
                     <>
                         {userRole === 'admin' && (
                             <div style={styles.reportButtonContainer}>
-                                <button onClick={() => setShowReportModal(true)} style={styles.reportButton}>
-                                    📊 Generate Report
-                                </button>
+                                <button onClick={() => setShowReportModal(true)} style={styles.reportButton}>📊 Generate Report</button>
                             </div>
                         )}
-                        
                         <div style={styles.statsGrid}>
                             <div style={styles.statCard}><h3>Total Products</h3><p style={styles.statNumber}>{products.length}</p></div>
                             <div style={styles.statCard}><h3>Total Sales</h3><p style={styles.statNumber}>${formatPrice(salesStats.totalSales || 0)}</p></div>
                             <div style={styles.statCard}><h3>Today's Sales</h3><p style={styles.statNumber}>${formatPrice(salesStats.todaySales || 0)}</p></div>
                             <div style={styles.statCard}><h3>Transactions</h3><p style={styles.statNumber}>{salesStats.saleCount || 0}</p></div>
                         </div>
-                        
                         <div style={styles.categoriesSection}>
                             <h3 style={styles.sectionTitle}>Product Categories</h3>
                             <div style={styles.categoryList}>
@@ -686,11 +794,7 @@ function App() {
                                     const categoryName = cat.name || cat.category_name;
                                     const productCount = products.filter(p => (p.category_id || p.category) === categoryId).length;
                                     return (
-                                        <div 
-                                            key={categoryId} 
-                                            style={styles.categoryCard}
-                                            onClick={() => setSelectedCategoryPage(categoryId)}
-                                        >
+                                        <div key={categoryId} style={styles.categoryCard} onClick={() => setSelectedCategoryPage(categoryId)}>
                                             <h4>{categoryName}</h4>
                                             <p>{cat.description || 'No description'}</p>
                                             <small style={styles.productCount}>{productCount} product(s)</small>
@@ -700,7 +804,6 @@ function App() {
                                 })}
                             </div>
                         </div>
-                        
                         <div style={styles.productsSection}>
                             <h3 style={styles.sectionTitle}>Recent Sales</h3>
                             <div style={styles.productTable}>
@@ -735,7 +838,6 @@ function App() {
                         </div>
                     </>
                 )}
-                
                 {activeTab === 'products' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
@@ -793,7 +895,6 @@ function App() {
                         </div>
                     </div>
                 )}
-                
                 {activeTab === 'purchases' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
@@ -831,7 +932,6 @@ function App() {
                         </div>
                     </div>
                 )}
-                
                 {activeTab === 'sales' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
@@ -871,7 +971,6 @@ function App() {
                         </div>
                     </div>
                 )}
-                
                 {activeTab === 'users' && userRole === 'admin' && (
                     <div style={styles.productsSection}>
                         <div style={styles.sectionHeader}>
@@ -896,18 +995,12 @@ function App() {
                                             <td>{u.full_name}</td>
                                             <td>{u.email}</td>
                                             <td>
-                                                <span style={{
-                                                    ...styles.roleBadge,
-                                                    backgroundColor: u.role === 'admin' ? '#dc3545' : '#28a745'
-                                                }}>
+                                                <span style={{...styles.roleBadge, backgroundColor: u.role === 'admin' ? '#dc3545' : '#28a745'}}>
                                                     {u.role}
                                                 </span>
                                             </td>
                                             <td>
-                                                <span style={{
-                                                    ...styles.statusBadge,
-                                                    backgroundColor: u.status === 'active' ? '#28a745' : '#dc3545'
-                                                }}>
+                                                <span style={{...styles.statusBadge, backgroundColor: u.status === 'active' ? '#28a745' : '#dc3545'}}>
                                                     {u.status}
                                                 </span>
                                             </td>
@@ -931,7 +1024,7 @@ function App() {
                 )}
             </div>
             
-            {/* Modals - same as before but kept concise */}
+            {/* Modals */}
             {showProductForm && !selectedCategoryPage && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -956,7 +1049,6 @@ function App() {
                     </div>
                 </div>
             )}
-            
             {editingProduct && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -981,7 +1073,6 @@ function App() {
                     </div>
                 </div>
             )}
-            
             {showUserForm && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -1002,7 +1093,6 @@ function App() {
                     </div>
                 </div>
             )}
-            
             {showPurchaseForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
@@ -1041,7 +1131,6 @@ function App() {
                     </div>
                 </div>
             )}
-            
             {showSaleForm && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modalLarge}>
@@ -1086,7 +1175,6 @@ function App() {
                     </div>
                 </div>
             )}
-            
             {showReportModal && userRole === 'admin' && (
                 <div style={styles.modalOverlay}>
                     <div style={styles.modal}>
@@ -1100,7 +1188,6 @@ function App() {
                                 <button onClick={() => { setReportType('inventory'); generatePDF(); }} style={styles.reportOptionButton}>PDF</button>
                                 <button onClick={() => exportToCSV('inventory')} style={styles.reportOptionButtonCSV}>CSV</button>
                             </div>
-                            
                             <h4 style={styles.reportSubtitle}>💰 Sales Report</h4>
                             <div style={styles.reportButtonGroup}>
                                 <button onClick={() => { setReportType('sales'); generatePDF(); }} style={styles.reportOptionButton}>PDF</button>
