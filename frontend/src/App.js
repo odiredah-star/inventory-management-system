@@ -1,7 +1,7 @@
 import toast, { Toaster } from 'react-hot-toast';
 import React, { useState, useEffect, useRef } from 'react';
 
-const API_URL = 'https://inventory-management-system-1-yji6.onrender.com';
+const API_URL = 'http://localhost:5000';
 
 // HARDCODED CATEGORIES - These will ALWAYS show
 const HARDCODED_CATEGORIES = [
@@ -88,8 +88,6 @@ function App() {
         const currentUserRole = user?.role || storedUser?.role;
         
         console.log("🔔 checkLowStockAlerts() called!", "showAll:", showAll);
-        console.log("Current user role:", currentUserRole);
-        console.log("Products count:", currentProducts.length);
         
         // Only show alerts for admin
         if (currentUserRole !== 'admin') {
@@ -108,38 +106,35 @@ function App() {
         console.log("Low stock products:", lowStockProducts.length);
         console.log("Out of stock products:", outOfStockProducts.length);
         
-        // Show all alerts immediately
+        // Show alerts with very small delay between each
         let delay = 0;
         
-        // Show all low stock products
         lowStockProducts.forEach(product => {
             const productId = product.product_id || product.id;
             const alertKey = `low_stock_${productId}`;
             if (showAll || !sessionStorage.getItem(alertKey)) {
                 setTimeout(() => {
                     toast.error(`⚠️ Low Stock: ${product.name} has only ${product.quantity_in_stock} left!`, {
-                        duration: 5000,
+                        duration: 4000,
                         position: 'top-center'
                     });
                 }, delay);
-                delay += 800;
+                delay += 150;
                 sessionStorage.setItem(alertKey, 'shown');
-                console.log(`Toast scheduled for ${product.name}`);
             }
         });
         
-        // Show all out of stock products
         outOfStockProducts.forEach(product => {
             const productId = product.product_id || product.id;
             const alertKey = `out_of_stock_${productId}`;
             if (showAll || !sessionStorage.getItem(alertKey)) {
                 setTimeout(() => {
                     toast.error(`❌ Out of Stock: ${product.name} is sold out!`, {
-                        duration: 5000,
+                        duration: 4000,
                         position: 'top-center'
                     });
                 }, delay);
-                delay += 800;
+                delay += 150;
                 sessionStorage.setItem(alertKey, 'shown');
             }
         });
@@ -166,8 +161,7 @@ function App() {
                 localStorage.setItem('user', JSON.stringify(data.data.user));
                 setMessage(`Welcome ${data.data.user.full_name}!`);
                 const loadedProducts = await loadAllData();
-                // Show alerts with the loaded products directly
-                setTimeout(() => checkLowStockAlerts(true, loadedProducts), 500);
+                setTimeout(() => checkLowStockAlerts(true, loadedProducts), 100);
             } else {
                 setMessage('Login failed: ' + data.error);
             }
@@ -453,7 +447,7 @@ function App() {
             if (data.success) {
                 setShowProductForm(false);
                 setNewProduct({ name: '', price: '', quantity_in_stock: '', category_id: '' });
-                const loadedProducts = await loadAllData();
+                await loadAllData();
                 setMessage('Product added!');
                 setTimeout(() => setMessage(''), 3000);
             } else {
@@ -473,7 +467,7 @@ function App() {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const loadedProducts = await loadAllData();
-            setTimeout(() => checkLowStockAlerts(true, loadedProducts), 500);
+            setTimeout(() => checkLowStockAlerts(true, loadedProducts), 100);
             setMessage('Product deleted');
             setTimeout(() => setMessage(''), 3000);
         } catch (error) {
@@ -510,7 +504,7 @@ function App() {
             if (data.success) {
                 setEditingProduct(null);
                 setEditProductData({ name: '', price: '', quantity_in_stock: '', category_id: '' });
-                const loadedProducts = await loadAllData();
+                await loadAllData();
                 setMessage('Product updated successfully!');
                 setTimeout(() => setMessage(''), 3000);
             } else {
@@ -581,8 +575,7 @@ function App() {
                 setShowSaleForm(false);
                 setNewSale({ customer_id: '', items: [{ product_id: '', quantity: '' }], payment_method: 'cash' });
                 const loadedProducts = await loadAllData();
-                // Show ALL alerts immediately after sale with the loaded products
-                setTimeout(() => checkLowStockAlerts(true, loadedProducts), 300);
+                setTimeout(() => checkLowStockAlerts(true, loadedProducts), 100);
                 setMessage('Sale recorded!');
                 setTimeout(() => setMessage(''), 3000);
             } else {
